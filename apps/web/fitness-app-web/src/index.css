@@ -203,6 +203,20 @@ h1, h2, h3, p {
   display: none;
 }
 
+.brand-wordmark {
+  display: none;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  background: linear-gradient(135deg, #ff7a00, #ffb067);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
 .app-shell.sidebar-collapsed .sidebar-toggle {
   margin-left: 0;
 }
@@ -2793,7 +2807,13 @@ h1, h2, h3, p {
   .app-shell.sidebar-collapsed .brand-row {
     width: auto;
     flex-direction: row;
+    align-items: center;
     gap: 10px;
+    flex: 1;
+  }
+
+  .app-shell.sidebar-collapsed .brand-wordmark {
+    display: block;
   }
 
   .app-shell.sidebar-collapsed .brand-row > div:not(.brand-mark),

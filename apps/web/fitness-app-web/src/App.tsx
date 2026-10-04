@@ -796,6 +796,7 @@ export default function App() {
             <h2>LOGOSFIT</h2>
             <small>Disciplina · Progreso · Equilibrio</small>
           </div>
+          <span className="brand-wordmark" aria-hidden="true">LOGOSFIT</span>
           <button
             aria-label={sidebarExpanded ? 'Contraer menú lateral' : 'Expandir menú lateral'}
             aria-expanded={sidebarExpanded}
