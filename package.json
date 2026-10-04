@@ -1,0 +1,8 @@
+{
+  "name": "fitness-app-v2",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

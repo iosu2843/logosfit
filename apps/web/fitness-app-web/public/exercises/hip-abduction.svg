@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="24" x2="448" y2="336" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45382E"/>
+      <stop offset="1" stop-color="#182321"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" rx="24" fill="url(#bg)"/>
+  <path d="M32 290H448" stroke="#D4A477" stroke-opacity=".2" stroke-width="2"/>
+  <path d="M85 290V112H113V290M369 290V112H397V290M85 135H397" stroke="#C7B5A4" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M174 218V156C174 143 184 133 197 133H283C296 133 306 143 306 156V218" stroke="#E3C5A1" stroke-width="15" stroke-linecap="round"/>
+  <path d="M193 119C193 99 209 83 229 83H251C271 83 287 99 287 119V151H193V119Z" fill="#E7B787"/>
+  <path d="M211 151V213M269 151V213" stroke="#E7B787" stroke-width="23" stroke-linecap="round"/>
+  <path d="M211 211L177 269M269 211L303 269" stroke="#E7B787" stroke-width="24" stroke-linecap="round"/>
+  <path d="M158 218H188M292 218H322" stroke="#FF9D3D" stroke-width="15" stroke-linecap="round"/>
+  <path d="M151 195L127 218L151 241M329 195L353 218L329 241" stroke="#FFB067" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="240" y="326" fill="#F5E7D8" font-family="Segoe UI, sans-serif" font-size="17" font-weight="700" text-anchor="middle">ABDUCCIÓN DE CADERA</text>
+</svg>

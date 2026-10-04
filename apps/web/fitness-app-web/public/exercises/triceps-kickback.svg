@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="40" y1="20" x2="440" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45382E"/>
+      <stop offset="1" stop-color="#182321"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" rx="24" fill="url(#bg)"/>
+  <path d="M36 292H444" stroke="#D4A477" stroke-opacity=".2" stroke-width="2"/>
+  <path d="M319 133H378V153H319M369 153V292" stroke="#C7B5A4" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M207 127L283 161L258 215L180 180L207 127Z" fill="#E7B787"/>
+  <circle cx="210" cy="99" r="31" fill="#E7B787"/>
+  <path d="M184 178L168 250M258 213L299 272" stroke="#E7B787" stroke-width="25" stroke-linecap="round"/>
+  <path d="M207 137L157 179L104 177" stroke="#E7B787" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M159 178L143 126" stroke="#E7B787" stroke-width="17" stroke-linecap="round"/>
+  <path d="M143 126L126 108" stroke="#FF9D3D" stroke-width="13" stroke-linecap="round"/>
+  <path d="M114 102L138 102M121 94V110" stroke="#FFB067" stroke-width="6" stroke-linecap="round"/>
+  <path d="M141 127L124 125L121 145" stroke="#FFB067" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="240" y="326" fill="#F5E7D8" font-family="Segoe UI, sans-serif" font-size="17" font-weight="700" text-anchor="middle">PATADA DE TRÍCEPS</text>
+</svg>
