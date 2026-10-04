@@ -15,6 +15,8 @@ const navIcons: Record<string, string> = {
   Nutrición: 'nav-nutrition',
 };
 
+const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+
 type CalendarExercise = { name: string; group: MuscleGroup; image?: string; equipment?: EquipmentType; kind?: ActivityKind };
 type TrainingDay = { name: string; type: string; exercises: CalendarExercise[] };
 type ExerciseMetrics = { sets: number; reps: number; weight: number; level: number; duration: number };
@@ -128,7 +130,7 @@ const trainingDays: Record<number, TrainingDay> = {
       { name: 'Press hombro máquina', group: 'Hombros', equipment: 'Máquina', image: exerciseImage('Leverage_Shoulder_Press') },
       { name: 'Elevaciones laterales polea', group: 'Hombros', equipment: 'Polea', image: exerciseImage('Cable_Seated_Lateral_Raise') },
       { name: 'Tríceps overhead', group: 'Tríceps', equipment: 'Polea', image: exerciseImage('Cable_Rope_Overhead_Triceps_Extension') },
-      { name: 'Patada tríceps', group: 'Tríceps', equipment: 'Mancuernas', image: '/exercises/triceps-kickback.svg' },
+      { name: 'Patada tríceps', group: 'Tríceps', equipment: 'Mancuernas', image: asset('exercises/triceps-kickback.svg') },
     ],
   },
   5: {
@@ -141,7 +143,7 @@ const trainingDays: Record<number, TrainingDay> = {
       { name: 'Curl femoral sentado', group: 'Isquiotibiales', equipment: 'Máquina', image: exerciseImage('Seated_Leg_Curl') },
       { name: 'Hip thrust máquina', group: 'Glúteos', equipment: 'Máquina', image: exerciseImage('Barbell_Hip_Thrust') },
       { name: 'Gemelos prensa', group: 'Gemelos', equipment: 'Máquina', image: exerciseImage('Calf_Press_On_The_Leg_Press_Machine') },
-      { name: 'Abducciones', group: 'Glúteos', equipment: 'Máquina', image: '/exercises/hip-abduction.svg' },
+      { name: 'Abducciones', group: 'Glúteos', equipment: 'Máquina', image: asset('exercises/hip-abduction.svg') },
     ],
   },
   6: {
@@ -788,7 +790,7 @@ export default function App() {
           <img
             alt="Emblema de LOGOSFIT"
             className="brand-logo"
-            src="/Captura%20de%20pantalla%202026-10-04%20180411.png"
+            src={asset('Captura%20de%20pantalla%202026-10-04%20180411.png')}
           />
           <div className="brand-copy">
             <h2>LOGOSFIT</h2>
@@ -845,7 +847,7 @@ export default function App() {
               type="button"
             >
               <svg className="nav-item-icon" aria-hidden="true" width="20" height="20">
-                <use href={`/nav-icons.svg#${navIcons[item]}`} />
+                <use href={`${asset('nav-icons.svg')}#${navIcons[item]}`} />
               </svg>
               <span className="nav-item-label">{item}</span>
             </button>
