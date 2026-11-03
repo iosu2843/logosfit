@@ -3064,3 +3064,19 @@ h1, h2, h3, p {
 .month-check { color: #3fb950; }
 .calendar-day-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 12px 16px; border: 1px solid var(--line, #333); border-radius: 12px; background: #121212; }
 .calendar-day-action.done { border-color: #3fb950; color: #3fb950; }
+
+.pr-banner { margin: 12px 0; padding: 12px 16px; border-radius: 12px; border: 1px solid #ffb84d; background: rgba(255, 184, 77, 0.14); color: #ffd27a; font-weight: 700; }
+.recovery-alert { margin: 12px 0; padding: 10px 16px; border-radius: 12px; border: 1px solid #ff9d3d; background: rgba(255, 157, 61, 0.1); }
+.recovery-alert p { margin: 4px 0; font-size: 0.9rem; }
+.weight-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: rgba(255, 157, 61, 0.12); font-size: 0.85rem; }
+.weight-suggestion button { border: 1px solid #ff9d3d; background: transparent; color: #ff9d3d; border-radius: 8px; padding: 4px 12px; cursor: pointer; font-weight: 700; }
+.set-log-list { font-size: 0.82rem; opacity: 0.8; }
+.one-rm-note { margin: 8px 0 0; font-size: 0.85rem; opacity: 0.85; }
+.progress-chart-point.record { fill: #ffb84d; stroke: #ffd27a; }
+.progress-chart-record { fill: #ffd27a; font-size: 12px; font-weight: 700; }
+.month-trophy { font-weight: 400; }
+.adherence-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.adherence-list { display: grid; gap: 8px; margin-top: 12px; }
+.adherence-row { display: grid; grid-template-columns: 110px 1fr 48px; align-items: center; gap: 12px; font-size: 0.85rem; }
+.adherence-bar { height: 10px; border-radius: 6px; background: #1d1d1d; overflow: hidden; }
+.adherence-bar div { height: 100%; background: #ff9d3d; border-radius: 6px; }

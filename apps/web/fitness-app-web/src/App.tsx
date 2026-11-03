@@ -6,7 +6,7 @@ import { equipmentTypes, exerciseLibrary, muscleGroups, dayTypeOptions, recommen
 import MuscleDiagram from './MuscleDiagram';
 import CloudPanel from './CloudPanel';
 import NumInput from './NumInput';
-import { countCompletedExercises, isDayCompleted, isDayStarted, recentSessions, sessionSets, sessionVolume, setExerciseProgress, type WorkoutLog } from './workoutLog';
+import { bestOneRepMax, countCompletedExercises, currentStreak, dayHasRecord, isDayCompleted, isDayStarted, personalBest, recentSessions, recordIds, recoveryWarnings, sessionSets, sessionVolume, setExerciseProgress, shiftWeeks, suggestNextWeight, suggestRestSeconds, topWeight, volumeByGroup, weekStartOf, weeklyAdherence, localKey, type SetLog, type WorkoutLog } from './workoutLog';
 import { removeItem, saveItem } from './cloud';
 import { analyzeMealDescription, type MealAnalysis } from './nutritionAnalyzer';
 import NutritionModule from './nutrition/NutritionModule';
@@ -39,7 +39,7 @@ const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//
 
 type CalendarExercise = { name: string; group: MuscleGroup; equipment?: EquipmentType; kind?: ActivityKind };
 type TrainingDay = { name: string; type: string; exercises: CalendarExercise[] };
-type ExerciseMetrics = { sets: number; reps: number; weight: number; level: number; duration: number };
+type ExerciseMetrics = { sets: number; reps: number; weight: number; level: number; duration: number; rest?: number };
 type ProgressPoint = { id: string; date: string; value: number };
 type ProfileProgressHistory = { bodyWeight: ProgressPoint[]; exerciseLoads: Record<string, ProgressPoint[]> };
 type FitnessProfile = {
@@ -269,6 +269,8 @@ function getMetrics(metrics: Record<string, ExerciseMetrics>, exercise: Calendar
     weight: saved?.weight ?? 0,
     level: saved?.level ?? 5,
     duration: saved?.duration ?? 20,
+    rest: saved?.rest ?? suggestRestSeconds(exercise.group),
+    restIsCustom: saved?.rest !== undefined,
   };
 }
 
@@ -304,7 +306,7 @@ function upsertProgressPoint(points: ProgressPoint[], point: ProgressPoint) {
   return nextPoints.sort((first, second) => first.date.localeCompare(second.date));
 }
 
-function ProgressLineChart({ points, unit, label }: { points: ProgressPoint[]; unit: string; label: string }) {
+function ProgressLineChart({ points, unit, label, records }: { points: ProgressPoint[]; unit: string; label: string; records?: Set<string> }) {
   if (points.length === 0) {
     return <div className="progress-empty-state">Aún no hay registros para mostrar.</div>;
   }
@@ -334,7 +336,15 @@ function ProgressLineChart({ points, unit, label }: { points: ProgressPoint[]; u
           return <line key={line} x1={padding} x2={width - padding} y1={y} y2={y} className="progress-chart-gridline" />;
         })}
         {points.length > 1 && <polyline points={polylinePoints} className="progress-chart-line" />}
-        {coordinates.map(({ x, y, point }) => <circle key={point.id} cx={x} cy={y} r="5" className="progress-chart-point" />)}
+        {coordinates.map(({ x, y, point }) => {
+          const isRecord = records?.has(point.id);
+          return (
+            <g key={point.id}>
+              <circle cx={x} cy={y} r={isRecord ? 7 : 5} className={isRecord ? 'progress-chart-point record' : 'progress-chart-point'} />
+              {isRecord && <text x={x} y={y - 12} textAnchor="middle" className="progress-chart-record">🏆 {point.value} kg</text>}
+            </g>
+          );
+        })}
       </svg>
       <div className="progress-chart-dates"><span>{formatProgressDate(points[0].date)}</span><span>{formatProgressDate(points[points.length - 1].date)}</span></div>
     </div>
@@ -354,6 +364,9 @@ export default function App() {
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [sessionSetsCompleted, setSessionSetsCompleted] = useState<Record<string, number>>({});
+  const [sessionSetLogs, setSessionSetLogs] = useState<Record<string, SetLog[]>>({});
+  const [repsDraft, setRepsDraft] = useState<Record<string, number>>({});
+  const [prNotice, setPrNotice] = useState('');
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => createRestTimer(60));
   const [restSecondsDraft, setRestSecondsDraft] = useState('60');
   const [exerciseMetricsByProfile, setExerciseMetricsByProfile] = useState(readSavedMetricsByProfile);
@@ -461,32 +474,46 @@ export default function App() {
     });
   };
 
-  const logExerciseSets = (exercise: CalendarExercise, sets: number) => {
-    if (!selectedDay) return;
-    const metrics = getMetrics(exerciseMetrics, exercise);
-    const isCardio = exercise.kind === 'cardio';
-    const date = localDateKey(selectedDate);
-    persistWorkoutLog((current) => setExerciseProgress(current, date, selectedDay, exercise.name, {
-      sets,
-      target: isCardio ? 1 : metrics.sets,
-      weight: isCardio ? 0 : metrics.weight,
-    }));
-    if (!isCardio && sets > 0) recordLoadPoint(date, selectedDate.getDay(), exercise.name, metrics.weight);
-  };
-
   const startWorkout = () => {
-    const saved = workoutLog[localDateKey(selectedDate)];
-    setSessionSetsCompleted(Object.fromEntries(Object.entries(saved?.exercises ?? {}).map(([name, entry]) => [name, entry.sets])));
+    const dateKeyValue = localDateKey(selectedDate);
+    const saved = workoutLog[dateKeyValue];
+    const repeating = isDayCompleted(dailyExercises, saved);
+    const savedExercises = repeating ? {} : saved?.exercises ?? {};
+    setSessionSetsCompleted(Object.fromEntries(Object.entries(savedExercises).map(([name, entry]) => [name, entry.sets])));
+    setSessionSetLogs(Object.fromEntries(Object.entries(savedExercises).map(([name, entry]) => [name, entry.setLogs ?? []])));
+    setRepsDraft({});
+    setPrNotice('');
     setRestTimer(createRestTimer(60));
     setRestSecondsDraft('60');
     setScreen('session');
   };
 
   const markWorkoutSetComplete = (exercise: CalendarExercise) => {
-    const plannedSets = exercise.kind === 'cardio' ? 1 : getMetrics(exerciseMetrics, exercise).sets;
+    if (!selectedDay) return;
+    const isCardio = exercise.kind === 'cardio';
+    const metrics = getMetrics(exerciseMetrics, exercise);
+    const plannedSets = isCardio ? 1 : metrics.sets;
     const nextCount = Math.min(plannedSets, (sessionSetsCompleted[exercise.name] ?? 0) + 1);
+    const date = localDateKey(selectedDate);
+    const previousSets = sessionSetLogs[exercise.name] ?? [];
+    const nextSetLogs = isCardio ? [] : [...previousSets, { weight: metrics.weight, reps: repsDraft[exercise.name] ?? metrics.reps }];
+    const previousBest = isCardio ? 0 : personalBest(workoutLog, exercise.name, date);
+    const topSet = nextSetLogs.reduce((best, set) => Math.max(best, set.weight), 0);
+    const isRecord = !isCardio && previousBest > 0 && topSet > previousBest;
+
     setSessionSetsCompleted((current) => ({ ...current, [exercise.name]: nextCount }));
-    logExerciseSets(exercise, nextCount);
+    setSessionSetLogs((current) => ({ ...current, [exercise.name]: nextSetLogs }));
+    if (isRecord) setPrNotice(`🏆 ¡Récord personal en ${exercise.name}: ${topSet} kg (antes ${previousBest} kg)!`);
+
+    persistWorkoutLog((current) => setExerciseProgress(current, date, selectedDay, exercise.name, {
+      sets: nextCount,
+      target: plannedSets,
+      weight: isCardio ? 0 : topSet,
+      group: exercise.group,
+      setLogs: nextSetLogs,
+      pr: isRecord || current[date]?.exercises[exercise.name]?.pr || undefined,
+    }));
+    if (!isCardio) recordLoadPoint(date, selectedDate.getDay(), exercise.name, topSet);
 
     if (nextCount >= plannedSets) {
       setCompletedByProfile((current) => {
@@ -497,23 +524,17 @@ export default function App() {
     }
   };
 
-  const beginRestPeriod = () => {
-    const requestedSeconds = Math.min(600, Math.max(1, Number(restSecondsDraft) || 60));
+  const beginRestPeriod = (seconds?: number) => {
+    const requestedSeconds = Math.min(600, Math.max(1, seconds ?? (Number(restSecondsDraft) || 60)));
     setRestSecondsDraft(String(requestedSeconds));
     setRestTimer(startRestTimer(createRestTimer(requestedSeconds)));
   };
 
   const finishWorkout = () => {
     setRestTimer((current) => pauseRestTimer(current));
-    if (selectedDay) {
-      const date = localDateKey(selectedDate);
-      selectedDay.exercises.forEach((exercise) => {
-        const sets = sessionSetsCompleted[exercise.name] ?? 0;
-        if (sets > 0) logExerciseSets(exercise, sets);
-      });
-      if (Object.values(sessionSetsCompleted).some((sets) => sets > 0)) {
-        persistWorkoutLog((current) => current[date] ? { ...current, [date]: { ...current[date], finishedAt: new Date().toISOString() } } : current);
-      }
+    const date = localDateKey(selectedDate);
+    if (Object.values(sessionSetsCompleted).some((sets) => sets > 0)) {
+      persistWorkoutLog((current) => current[date] ? { ...current, [date]: { ...current[date], finishedAt: new Date().toISOString() } } : current);
     }
     setScreen('overview');
   };
@@ -751,6 +772,22 @@ export default function App() {
     return isDayStarted(log) ? 'partial' : 'none';
   };
   const trainingHistory = recentSessions(workoutLog, 10);
+  const todayDate = new Date();
+  const thisWeekAdherence = weeklyAdherence(activeTrainingPlan, workoutLog, weekStartOf(todayDate));
+  const streak = currentStreak(activeTrainingPlan, workoutLog, todayDate);
+  const adherenceWeeks = Array.from({ length: 6 }, (_, index) => {
+    const start = shiftWeeks(weekStartOf(todayDate), index - 5);
+    return { start, ...weeklyAdherence(activeTrainingPlan, workoutLog, start) };
+  });
+  const recoveryAlerts = recoveryWarnings(activeTrainingPlan, workoutLog, selectedDate, todayDate);
+  const recordCount = Object.values(workoutLog).filter((day) => dayHasRecord(day)).length;
+  const volumeKeyTo = localKey(todayDate);
+  const volumeKeyFrom = localKey(shiftWeeks(todayDate, -1));
+  const groupVolume = Object.entries(volumeByGroup(workoutLog, volumeKeyFrom, volumeKeyTo)).sort((first, second) => second[1].volume - first[1].volume);
+  const strengthEstimates = [...new Set(Object.values(workoutLog).flatMap((day) => Object.keys(day.exercises)))]
+    .map((name) => ({ name, oneRm: bestOneRepMax(workoutLog, name), top: Math.max(0, ...Object.values(workoutLog).map((day) => day.exercises[name] ? topWeight(day.exercises[name]) : 0)) }))
+    .filter((item) => item.oneRm > 0)
+    .sort((first, second) => second.oneRm - first.oneRm);
   const completedSessionCount = Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).length;
   const plannedDailySets = dailyExercises
     .filter((exercise) => exercise.kind !== 'cardio')
@@ -768,6 +805,14 @@ export default function App() {
   const nextWorkoutDateLabel = nextWorkout
     ? new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(nextWorkout.date)
     : '';
+  const sidebarSuggestion = (() => {
+    const candidates = [...(nextWorkout?.day.exercises ?? []), ...(selectedDay?.exercises ?? [])].filter((exercise) => exercise.kind !== 'cardio');
+    for (const exercise of candidates) {
+      const suggestion = suggestNextWeight(workoutLog, exercise, getMetrics(exerciseMetrics, exercise), '9999-12-31');
+      if (suggestion) return { exerciseName: exercise.name, ...suggestion };
+    }
+    return null;
+  })();
 
   const groupedLibrary = muscleGroups
     .filter((group) => muscleFilter === 'Todos' || group === muscleFilter)
@@ -834,7 +879,7 @@ export default function App() {
         ...current,
         [profileScopeId]: {
           ...exerciseMetrics,
-          [key]: { ...getMetrics(exerciseMetrics, exercise), [field]: value },
+          [key]: { sets: getMetrics(exerciseMetrics, exercise).sets, reps: getMetrics(exerciseMetrics, exercise).reps, weight: getMetrics(exerciseMetrics, exercise).weight, level: getMetrics(exerciseMetrics, exercise).level, duration: getMetrics(exerciseMetrics, exercise).duration, rest: exerciseMetrics[key]?.rest, [field]: value },
         },
       };
       saveItem('fitness-calendar-metrics-by-profile', JSON.stringify(next));
@@ -978,8 +1023,8 @@ export default function App() {
 
         <div className="mini-card" style={{ background: '#121212' }}>
           <p className="eyebrow muted">Próxima carga</p>
-          <h3>{nextWeight} kg</h3>
-          <small>Aumento sugerido según la última sesión</small>
+          <h3>{sidebarSuggestion ? sidebarSuggestion.weight : nextWeight} kg</h3>
+          <small>{sidebarSuggestion ? `${sidebarSuggestion.exerciseName}: ${sidebarSuggestion.reason}` : 'Aumento sugerido según la última sesión'}</small>
         </div>
       </aside>
 
@@ -998,6 +1043,8 @@ export default function App() {
               </div>
             </header>
 
+            {prNotice && <div className="pr-banner" role="status">{prNotice}</div>}
+            {recoveryAlerts.length > 0 && <div className="recovery-alert" role="alert">{recoveryAlerts.map((message) => <p key={message}>⚠️ {message}</p>)}</div>}
             {selectedDay?.exercises.length ? (
               <div className="session-layout">
                 <section className="session-exercise-list">
@@ -1026,6 +1073,27 @@ export default function App() {
                         ) : (
                           <div className="session-strength-metrics">
                             <span>{metrics.sets} series · {metrics.reps} reps planificadas</span>
+                            {(() => {
+                              const suggestion = suggestNextWeight(workoutLog, exercise, metrics, localDateKey(selectedDate));
+                              if (!suggestion || suggestion.weight === metrics.weight) return null;
+                              return (
+                                <div className="weight-suggestion">
+                                  <span>💡 Sugerido: <strong>{suggestion.weight} kg</strong> · {suggestion.reason}</span>
+                                  <button type="button" onClick={() => changeExerciseMetric(exercise, 'weight', suggestion.weight)}>Aplicar</button>
+                                </div>
+                              );
+                            })()}
+                            <label>
+                              Reps realizadas (próxima serie)
+                              <NumInput aria-label={`Repeticiones realizadas en ${exercise.name}`} min="1" max="100" value={repsDraft[exercise.name] ?? metrics.reps} onChange={(event) => setRepsDraft((current) => ({ ...current, [exercise.name]: Math.max(0, Number(event.target.value)) }))} />
+                            </label>
+                            <label>
+                              Descanso {metrics.restIsCustom ? '' : `(sugerido para ${exercise.group})`}
+                              <span className="session-weight-input"><NumInput aria-label={`Descanso de ${exercise.name}`} min="10" max="600" step="15" value={metrics.rest} onChange={(event) => changeExerciseMetric(exercise, 'rest', Math.min(600, Math.max(0, Number(event.target.value))))} /><small>s</small></span>
+                            </label>
+                            {(sessionSetLogs[exercise.name] ?? []).length > 0 && (
+                              <span className="set-log-list">Series: {(sessionSetLogs[exercise.name] ?? []).map((set) => `${set.weight} kg × ${set.reps}`).join(' · ')}</span>
+                            )}
                             <label>
                               Peso utilizado
                               <span className="session-weight-input"><NumInput aria-label={`Peso utilizado en ${exercise.name}`} min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} /><small>kg</small></span>
@@ -1037,7 +1105,7 @@ export default function App() {
                           <button className="session-set-button" type="button" disabled={isComplete} onClick={() => markWorkoutSetComplete(exercise)}>
                             {isComplete ? 'Ejercicio completado' : exercise.kind === 'cardio' ? 'Marcar actividad completada' : `Completar serie ${completedSets + 1} de ${targetSets}`}
                           </button>
-                          {exercise.kind !== 'cardio' && <button className="rest-start-button" type="button" onClick={beginRestPeriod}>Iniciar descanso</button>}
+                          {exercise.kind !== 'cardio' && <button className="rest-start-button" type="button" onClick={() => beginRestPeriod(metrics.rest)}>Iniciar descanso ({metrics.rest} s)</button>}
                         </div>
                       </article>
                     );
@@ -1052,7 +1120,7 @@ export default function App() {
                     <span><input aria-label="Duración del descanso en segundos" type="number" min="1" max="600" step="15" value={restSecondsDraft} onChange={(event) => setRestSecondsDraft(event.target.value)} /><small>seg</small></span>
                   </label>
                   <div className="rest-timer-actions">
-                    <button className="primary-btn" type="button" onClick={beginRestPeriod}>Iniciar</button>
+                    <button className="primary-btn" type="button" onClick={() => beginRestPeriod()}>Iniciar</button>
                     <button className="ghost-btn" type="button" onClick={() => setRestTimer((current) => pauseRestTimer(current))}>Pausar</button>
                     <button className="ghost-btn" type="button" onClick={() => setRestTimer((current) => resetRestTimer(current))}>Reiniciar</button>
                   </div>
@@ -1106,6 +1174,25 @@ export default function App() {
             <section className="progress-panel-card" style={{ background: theme.card }}>
               <div className="section-header progress-section-header">
                 <div>
+                  <p className="eyebrow muted">Constancia</p>
+                  <h2>Adherencia semanal</h2>
+                </div>
+                <span>Racha: {streak} {streak === 1 ? 'sesión' : 'sesiones'}</span>
+              </div>
+              <div className="adherence-list">
+                {adherenceWeeks.map((week) => (
+                  <div className="adherence-row" key={localKey(week.start)}>
+                    <span>{formatProgressDate(localKey(week.start))}</span>
+                    <div className="adherence-bar"><div style={{ width: `${week.planned ? Math.round((week.completed / week.planned) * 100) : 0}%` }} /></div>
+                    <strong>{week.completed}/{week.planned}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="progress-panel-card" style={{ background: theme.card }}>
+              <div className="section-header progress-section-header">
+                <div>
                   <p className="eyebrow muted">Calendario</p>
                   <h2>Entrenamientos realizados</h2>
                 </div>
@@ -1123,7 +1210,7 @@ export default function App() {
                           <td>{log.dayName} · {log.dayType}</td>
                           <td>{sessionSets(log)}</td>
                           <td>{Math.round(sessionVolume(log))} kg</td>
-                          <td>{isDayCompleted(planned, log) ? '✓ Completado' : 'Parcial'}</td>
+                          <td>{isDayCompleted(planned, log) ? '✓ Completado' : 'Parcial'}{dayHasRecord(log) ? ' 🏆' : ''}</td>
                         </tr>
                       );
                     })}</tbody>
@@ -1131,6 +1218,32 @@ export default function App() {
                 </div>
               ) : (
                 <div className="progress-empty-state">Empieza un entrenamiento desde el calendario: las cargas y series se guardarán aquí automáticamente.</div>
+              )}
+            </section>
+
+            <section className="progress-panel-card" style={{ background: theme.card }}>
+              <div className="section-header progress-section-header">
+                <div>
+                  <p className="eyebrow muted">Últimos 7 días</p>
+                  <h2>Volumen por grupo muscular y 1RM estimado</h2>
+                </div>
+                <span>Epley: peso × (1 + reps/30)</span>
+              </div>
+              {groupVolume.length ? (
+                <div className="progress-table-wrap">
+                  <table className="progress-history-table">
+                    <thead><tr><th>Grupo muscular</th><th>Series</th><th>Volumen</th></tr></thead>
+                    <tbody>{groupVolume.map(([group, data]) => <tr key={group}><td>{group}</td><td>{data.sets}</td><td>{Math.round(data.volume)} kg</td></tr>)}</tbody>
+                  </table>
+                </div>
+              ) : <div className="progress-empty-state">Completa series en una sesión para ver el volumen por grupo muscular.</div>}
+              {strengthEstimates.length > 0 && (
+                <div className="progress-table-wrap">
+                  <table className="progress-history-table">
+                    <thead><tr><th>Ejercicio</th><th>Mejor carga</th><th>1RM estimado</th></tr></thead>
+                    <tbody>{strengthEstimates.slice(0, 10).map((item) => <tr key={item.name}><td>{item.name}</td><td>{item.top} kg</td><td>{item.oneRm} kg</td></tr>)}</tbody>
+                  </table>
+                </div>
               )}
             </section>
 
@@ -1178,7 +1291,8 @@ export default function App() {
                           <h3>{exerciseName} · {progressDay?.name ?? weekdayNames[progressDayIndex]}</h3>
                           <span>{points.length} registros</span>
                         </div>
-                        <ProgressLineChart points={points} unit="kg" label={`Progresión de carga para ${exerciseName}`} />
+                        <ProgressLineChart points={points} unit="kg" label={`Progresión de carga para ${exerciseName}`} records={recordIds(points)} />
+                        {bestOneRepMax(workoutLog, exerciseName) > 0 && <p className="one-rm-note">1RM estimado: <strong>{bestOneRepMax(workoutLog, exerciseName)} kg</strong> (fórmula de Epley con tus series registradas)</p>}
                         <div className="progress-table-wrap">
                           <table className="progress-history-table">
                             <thead><tr><th>Fecha</th><th>Carga utilizada</th></tr></thead>
@@ -1663,7 +1777,7 @@ export default function App() {
                     <button key={dateKey(date)} className={`week-day ${selected ? 'selected' : ''} ${day ? 'has-workout' : ''} ${status === 'done' ? 'day-done' : status === 'partial' ? 'day-partial' : ''}`} type="button" onClick={() => openCalendarDate(date)}>
                       <span className="week-day-name">{weekDays[index]}</span>
                       <strong>{date.getDate()}</strong>
-                      {status !== 'none' && <span className="day-check">{status === 'done' ? '✓ Completado' : 'En progreso'}</span>}
+                      {status !== 'none' && <span className="day-check">{status === 'done' ? '✓ Completado' : 'En progreso'}{dayHasRecord(workoutLog[localDateKey(date)]) ? ' 🏆' : ''}</span>}
                       {day ? <><span className="day-type">{day.type}</span><span className="day-exercise-preview">{day.exercises.slice(0, 3).map((exercise) => exercise.name).join(' · ')}{day.exercises.length > 3 ? ` +${day.exercises.length - 3}` : ''}</span></> : <span className="rest-label">Descanso</span>}
                     </button>
                   );
@@ -1679,7 +1793,7 @@ export default function App() {
                   const status = dayStatus(date);
                   return (
                     <button key={dateKey(date)} className={`month-day ${selected ? 'selected' : ''} ${!inMonth ? 'outside-month' : ''} ${day ? 'has-workout' : ''} ${status === 'done' ? 'day-done' : status === 'partial' ? 'day-partial' : ''}`} type="button" onClick={() => openCalendarDate(date)}>
-                      <span className="month-day-number">{date.getDate()}{status === 'done' && <b className="month-check" aria-label="Completado"> ✓</b>}</span>
+                      <span className="month-day-number">{date.getDate()}{status === 'done' && <b className="month-check" aria-label="Completado"> ✓</b>}{dayHasRecord(workoutLog[localDateKey(date)]) && <b className="month-trophy" aria-label="Récord personal"> 🏆</b>}</span>
                       {day && <span className="month-workout-label">{day.type}</span>}
                       {day?.exercises.length ? (
                         <span className="month-exercise-preview">
@@ -1702,6 +1816,8 @@ export default function App() {
                 </div>
                 <span>{selectedDay ? `${selectedDay.exercises.length} ejercicios` : 'Recuperación'}</span>
               </div>
+              {dayHasRecord(selectedDayLog) && <div className="pr-banner">🏆 Este día batiste un récord personal.</div>}
+              {recoveryAlerts.length > 0 && <div className="recovery-alert" role="alert">{recoveryAlerts.map((message) => <p key={message}>⚠️ {message}</p>)}</div>}
               {selectedDay && (
                 <div className={`calendar-day-action ${selectedDayCompleted ? 'done' : ''}`}>
                   <span>{selectedDayCompleted ? '✓ Entrenamiento completado' : `Progreso: ${completedDailyExercises}/${dailyExercises.length} ejercicios`}</span>
@@ -1748,6 +1864,22 @@ export default function App() {
                 )}
               </div>
               <button className="hero-link" type="button" onClick={() => setActiveNav('Calendario')}>Ver plan</button>
+            </section>
+
+            {recoveryAlerts.length > 0 && <div className="recovery-alert" role="alert">{recoveryAlerts.map((message) => <p key={message}>⚠️ {message}</p>)}</div>}
+            <section className="stats-grid adherence-grid" aria-label="Constancia semanal">
+              <div className="stat-card summary-stat-card" style={{ background: theme.card }}>
+                <span>Esta semana</span>
+                <strong>{thisWeekAdherence.completed}/{thisWeekAdherence.planned}<small>entrenos</small></strong>
+              </div>
+              <div className="stat-card summary-stat-card" style={{ background: theme.card }}>
+                <span>Racha actual</span>
+                <strong>{streak}<small>{streak === 1 ? 'sesión' : 'sesiones'}</small></strong>
+              </div>
+              <div className="stat-card summary-stat-card" style={{ background: theme.card }}>
+                <span>Récords personales</span>
+                <strong>{recordCount}<small>🏆</small></strong>
+              </div>
             </section>
 
             <section className="stats-grid daily-summary-grid" aria-label="Resumen del día">
