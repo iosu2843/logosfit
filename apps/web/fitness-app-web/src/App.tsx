@@ -363,6 +363,7 @@ export default function App() {
   const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [todayDate, setTodayDate] = useState(() => new Date());
   const [sessionSetsCompleted, setSessionSetsCompleted] = useState<Record<string, number>>({});
   const [sessionSetLogs, setSessionSetLogs] = useState<Record<string, SetLog[]>>({});
   const [repsDraft, setRepsDraft] = useState<Record<string, number>>({});
@@ -439,6 +440,27 @@ export default function App() {
         { label: 'Peso objetivo', value: activeProfile.goalWeight || '--', unit: 'kg' },
       ]
     : defaultStats;
+
+  useEffect(() => {
+    const refreshToday = () => {
+      const now = new Date();
+      setTodayDate((current) => {
+        if (localDateKey(current) === localDateKey(now)) return current;
+        setSelectedDate((selected) => (localDateKey(selected) === localDateKey(current) ? now : selected));
+        setCalendarDate((calendar) => (localDateKey(calendar) === localDateKey(current) ? now : calendar));
+        setProgressDayIndex((index) => (index === current.getDay() ? now.getDay() : index));
+        return now;
+      });
+    };
+    const intervalId = window.setInterval(refreshToday, 30000);
+    document.addEventListener('visibilitychange', refreshToday);
+    window.addEventListener('focus', refreshToday);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshToday);
+      window.removeEventListener('focus', refreshToday);
+    };
+  }, []);
 
   useEffect(() => {
     if (!restTimer.isRunning) return;
@@ -772,7 +794,6 @@ export default function App() {
     return isDayStarted(log) ? 'partial' : 'none';
   };
   const trainingHistory = recentSessions(workoutLog, 10);
-  const todayDate = new Date();
   const thisWeekAdherence = weeklyAdherence(activeTrainingPlan, workoutLog, weekStartOf(todayDate));
   const streak = currentStreak(activeTrainingPlan, workoutLog, todayDate);
   const adherenceWeeks = Array.from({ length: 6 }, (_, index) => {
@@ -798,13 +819,20 @@ export default function App() {
     { label: 'Series previstas', value: String(plannedDailySets) },
     { label: 'Completados', value: selectedDay ? `${completedDailyExercises}/${dailyExercises.length}` : '—' },
   ];
-  const nextWorkout = Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(new Date(), index + 1);
-    return { date, day: activeTrainingPlan[date.getDay()] };
-  }).find(({ day }) => day?.exercises.length);
+  const nextWorkout = Array.from({ length: 8 }, (_, index) => {
+    const date = addDays(todayDate, index);
+    return { date, offset: index, day: activeTrainingPlan[date.getDay()] };
+  }).find(({ date, offset, day }) => day?.exercises.length && (offset > 0 || !isDayCompleted(day.exercises, workoutLog[localDateKey(date)])));
   const nextWorkoutDateLabel = nextWorkout
-    ? new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(nextWorkout.date)
+    ? nextWorkout.offset === 0
+      ? 'Hoy'
+      : nextWorkout.offset === 1
+        ? 'Mañana'
+        : new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(nextWorkout.date)
     : '';
+  const nextWorkoutIsToday = nextWorkout?.offset === 0 && localDateKey(selectedDate) === localDateKey(todayDate);
+  const nextWorkoutProgress = nextWorkout?.offset === 0 ? countCompletedExercises(nextWorkout.day.exercises, workoutLog[localDateKey(nextWorkout.date)]) : 0;
+  const todayDone = isDayCompleted(activeTrainingPlan[todayDate.getDay()]?.exercises ?? [], workoutLog[localDateKey(todayDate)]);
   const sidebarSuggestion = (() => {
     const candidates = [...(nextWorkout?.day.exercises ?? []), ...(selectedDay?.exercises ?? [])].filter((exercise) => exercise.kind !== 'cardio');
     for (const exercise of candidates) {
@@ -1007,6 +1035,11 @@ export default function App() {
               onClick={() => {
                 setActiveNav(item);
                 setScreen('overview');
+                if (item === 'Home') {
+                  setSelectedDate(new Date());
+                  setCalendarDate(new Date());
+                  setProgressDayIndex(new Date().getDay());
+                }
                 if (window.matchMedia('(max-width: 900px)').matches) {
                   setSidebarExpanded(false);
                 }
@@ -1854,16 +1887,20 @@ export default function App() {
                 {nextWorkout ? (
                   <>
                     <h2>{nextWorkout.day.name} · {nextWorkout.day.type}</h2>
+                    {nextWorkout.offset === 0 && nextWorkoutProgress > 0 && <p>Llevas {nextWorkoutProgress}/{nextWorkout.day.exercises.length} ejercicios hoy</p>}
                     <p>{nextWorkoutDateLabel} · {nextWorkout.day.exercises.map((exercise) => exercise.name).slice(0, 3).join(' · ')}{nextWorkout.day.exercises.length > 3 ? ` +${nextWorkout.day.exercises.length - 3}` : ''}</p>
                   </>
                 ) : (
                   <>
-                    <h2>Sin sesiones programadas</h2>
+                    <h2>{todayDone ? 'Entrenamiento de hoy completado ✓' : 'Sin sesiones programadas'}</h2>
                     <p>Configura tu plan semanal en el editor de ejercicios.</p>
                   </>
                 )}
               </div>
-              <button className="hero-link" type="button" onClick={() => setActiveNav('Calendario')}>Ver plan</button>
+              <div className="hero-actions">
+                {nextWorkoutIsToday && <button className="hero-link" type="button" onClick={startWorkout}>{nextWorkoutProgress > 0 ? 'Continuar' : 'Empezar ahora'}</button>}
+                <button className="hero-link" type="button" onClick={() => setActiveNav('Calendario')}>Ver plan</button>
+              </div>
             </section>
 
             {recoveryAlerts.length > 0 && <div className="recovery-alert" role="alert">{recoveryAlerts.map((message) => <p key={message}>⚠️ {message}</p>)}</div>}

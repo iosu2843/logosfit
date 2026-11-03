@@ -3080,3 +3080,5 @@ h1, h2, h3, p {
 .adherence-row { display: grid; grid-template-columns: 110px 1fr 48px; align-items: center; gap: 12px; font-size: 0.85rem; }
 .adherence-bar { height: 10px; border-radius: 6px; background: #1d1d1d; overflow: hidden; }
 .adherence-bar div { height: 100%; background: #ff9d3d; border-radius: 6px; }
+
+.hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
