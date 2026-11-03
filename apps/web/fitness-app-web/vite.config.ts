@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/logosfit/' : '/',
+export default defineConfig(({ command, mode }) => ({
+  base: mode === 'android' ? './' : command === 'build' ? '/logosfit/' : '/',
   plugins: [react()],
   resolve: {
     alias: {

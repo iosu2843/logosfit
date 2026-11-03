@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LOGOSFIT</string>
+    <string name="title_activity_main">LOGOSFIT</string>
+    <string name="package_name">com.logosfit.app</string>
+    <string name="custom_url_scheme">com.logosfit.app</string>
+</resources>
