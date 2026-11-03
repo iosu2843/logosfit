@@ -11,6 +11,7 @@ const syncedKeys = [
   'fitness-calendar-metrics-by-profile',
   'fitness-completed-exercises-by-profile',
   'fitness-progress-history-by-profile',
+  'fitness-workout-log-by-profile',
   'fitness-nutrition-by-profile',
   'fitness-nutrition-ai-by-profile',
   'fitness-training-plans-by-profile',

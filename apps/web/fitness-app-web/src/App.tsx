@@ -6,6 +6,7 @@ import { equipmentTypes, exerciseLibrary, muscleGroups, dayTypeOptions, recommen
 import MuscleDiagram from './MuscleDiagram';
 import CloudPanel from './CloudPanel';
 import NumInput from './NumInput';
+import { countCompletedExercises, isDayCompleted, isDayStarted, recentSessions, sessionSets, sessionVolume, setExerciseProgress, type WorkoutLog } from './workoutLog';
 import { removeItem, saveItem } from './cloud';
 import { analyzeMealDescription, type MealAnalysis } from './nutritionAnalyzer';
 import NutritionModule from './nutrition/NutritionModule';
@@ -228,6 +229,14 @@ function readProgressHistoryByProfile(): Record<string, ProfileProgressHistory> 
   }
 }
 
+function readWorkoutLogByProfile(): Record<string, WorkoutLog> {
+  try {
+    return JSON.parse(localStorage.getItem('fitness-workout-log-by-profile') ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
 function readNutritionByProfile(): Record<string, NutritionProfileData> {
   try {
     return JSON.parse(localStorage.getItem('fitness-nutrition-by-profile') ?? '{}');
@@ -351,6 +360,7 @@ export default function App() {
   const [trainingPlansByProfile, setTrainingPlansByProfile] = useState(readSavedTrainingPlansByProfile);
   const [progressHistoryByProfile, setProgressHistoryByProfile] = useState(readProgressHistoryByProfile);
   const [nutritionByProfile, setNutritionByProfile] = useState(readNutritionByProfile);
+  const [workoutLogByProfile, setWorkoutLogByProfile] = useState(readWorkoutLogByProfile);
   const [editorDayIndex, setEditorDayIndex] = useState(1);
   const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | 'Todos'>('Todos');
   const [equipmentFilter, setEquipmentFilter] = useState<EquipmentType | 'Todos'>('Todos');
@@ -380,6 +390,7 @@ export default function App() {
   const exerciseMetrics = exerciseMetricsByProfile[profileScopeId] ?? {};
   const activeTrainingPlan = trainingPlansByProfile[profileScopeId] ?? trainingDays;
   const progressHistory = progressHistoryByProfile[profileScopeId] ?? { bodyWeight: [], exerciseLoads: {} };
+  const workoutLog = workoutLogByProfile[profileScopeId] ?? {};
   const nutritionData = nutritionByProfile[profileScopeId] ?? defaultNutritionData(activeProfile);
   const nutritionEntriesToday = nutritionData.entriesByDay[localDateKey()] ?? [];
   const mealEntriesToday = nutritionEntriesToday.filter((entry) => entry.kind === 'meal' && entry.macros);
@@ -424,8 +435,48 @@ export default function App() {
     return () => window.clearInterval(intervalId);
   }, [restTimer.isRunning]);
 
+  const persistWorkoutLog = (update: (current: WorkoutLog) => WorkoutLog) => {
+    setWorkoutLogByProfile((current) => {
+      const next = { ...current, [profileScopeId]: update(current[profileScopeId] ?? {}) };
+      saveItem('fitness-workout-log-by-profile', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const recordLoadPoint = (date: string, dayIndex: number, exerciseName: string, weight: number) => {
+    if (weight <= 0) return;
+    const key = exerciseLoadKey(dayIndex, exerciseName);
+    const point: ProgressPoint = { id: `load-${date}-${exerciseName}`, date, value: weight };
+    setProgressHistoryByProfile((current) => {
+      const profileHistory = current[profileScopeId] ?? { bodyWeight: [], exerciseLoads: {} };
+      const next = {
+        ...current,
+        [profileScopeId]: {
+          ...profileHistory,
+          exerciseLoads: { ...profileHistory.exerciseLoads, [key]: upsertProgressPoint(profileHistory.exerciseLoads[key] ?? [], point) },
+        },
+      };
+      saveItem('fitness-progress-history-by-profile', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const logExerciseSets = (exercise: CalendarExercise, sets: number) => {
+    if (!selectedDay) return;
+    const metrics = getMetrics(exerciseMetrics, exercise);
+    const isCardio = exercise.kind === 'cardio';
+    const date = localDateKey(selectedDate);
+    persistWorkoutLog((current) => setExerciseProgress(current, date, selectedDay, exercise.name, {
+      sets,
+      target: isCardio ? 1 : metrics.sets,
+      weight: isCardio ? 0 : metrics.weight,
+    }));
+    if (!isCardio && sets > 0) recordLoadPoint(date, selectedDate.getDay(), exercise.name, metrics.weight);
+  };
+
   const startWorkout = () => {
-    setSessionSetsCompleted({});
+    const saved = workoutLog[localDateKey(selectedDate)];
+    setSessionSetsCompleted(Object.fromEntries(Object.entries(saved?.exercises ?? {}).map(([name, entry]) => [name, entry.sets])));
     setRestTimer(createRestTimer(60));
     setRestSecondsDraft('60');
     setScreen('session');
@@ -435,6 +486,7 @@ export default function App() {
     const plannedSets = exercise.kind === 'cardio' ? 1 : getMetrics(exerciseMetrics, exercise).sets;
     const nextCount = Math.min(plannedSets, (sessionSetsCompleted[exercise.name] ?? 0) + 1);
     setSessionSetsCompleted((current) => ({ ...current, [exercise.name]: nextCount }));
+    logExerciseSets(exercise, nextCount);
 
     if (nextCount >= plannedSets) {
       setCompletedByProfile((current) => {
@@ -453,6 +505,16 @@ export default function App() {
 
   const finishWorkout = () => {
     setRestTimer((current) => pauseRestTimer(current));
+    if (selectedDay) {
+      const date = localDateKey(selectedDate);
+      selectedDay.exercises.forEach((exercise) => {
+        const sets = sessionSetsCompleted[exercise.name] ?? 0;
+        if (sets > 0) logExerciseSets(exercise, sets);
+      });
+      if (Object.values(sessionSetsCompleted).some((sets) => sets > 0)) {
+        persistWorkoutLog((current) => current[date] ? { ...current, [date]: { ...current[date], finishedAt: new Date().toISOString() } } : current);
+      }
+    }
     setScreen('overview');
   };
 
@@ -679,7 +741,17 @@ export default function App() {
   const visibleMonth = Array.from({ length: 42 }, (_, index) => addDays(monthGridStart, index));
   const selectedDay = activeTrainingPlan[selectedDate.getDay()];
   const dailyExercises = selectedDay?.exercises ?? [];
-  const completedDailyExercises = dailyExercises.filter((exercise) => Boolean(completed[exercise.name])).length;
+  const selectedDayLog = workoutLog[localDateKey(selectedDate)];
+  const completedDailyExercises = countCompletedExercises(dailyExercises, selectedDayLog);
+  const selectedDayCompleted = isDayCompleted(dailyExercises, selectedDayLog);
+  const dayStatus = (date: Date): 'done' | 'partial' | 'none' => {
+    const planned = activeTrainingPlan[date.getDay()]?.exercises ?? [];
+    const log = workoutLog[localDateKey(date)];
+    if (isDayCompleted(planned, log)) return 'done';
+    return isDayStarted(log) ? 'partial' : 'none';
+  };
+  const trainingHistory = recentSessions(workoutLog, 10);
+  const completedSessionCount = Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).length;
   const plannedDailySets = dailyExercises
     .filter((exercise) => exercise.kind !== 'cardio')
     .reduce((total, exercise) => total + getMetrics(exerciseMetrics, exercise).sets, 0);
@@ -1029,6 +1101,37 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+            </section>
+
+            <section className="progress-panel-card" style={{ background: theme.card }}>
+              <div className="section-header progress-section-header">
+                <div>
+                  <p className="eyebrow muted">Calendario</p>
+                  <h2>Entrenamientos realizados</h2>
+                </div>
+                <span>{completedSessionCount} completados</span>
+              </div>
+              {trainingHistory.length ? (
+                <div className="progress-table-wrap">
+                  <table className="progress-history-table">
+                    <thead><tr><th>Fecha</th><th>Sesión</th><th>Series</th><th>Volumen</th><th>Estado</th></tr></thead>
+                    <tbody>{trainingHistory.map(({ date, log }) => {
+                      const planned = activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [];
+                      return (
+                        <tr key={date}>
+                          <td>{formatProgressDate(date)}</td>
+                          <td>{log.dayName} · {log.dayType}</td>
+                          <td>{sessionSets(log)}</td>
+                          <td>{Math.round(sessionVolume(log))} kg</td>
+                          <td>{isDayCompleted(planned, log) ? '✓ Completado' : 'Parcial'}</td>
+                        </tr>
+                      );
+                    })}</tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="progress-empty-state">Empieza un entrenamiento desde el calendario: las cargas y series se guardarán aquí automáticamente.</div>
+              )}
             </section>
 
             <section className="progress-panel-card" style={{ background: theme.card }}>
@@ -1555,10 +1658,12 @@ export default function App() {
                 {visibleWeek.map((date, index) => {
                   const day = activeTrainingPlan[date.getDay()];
                   const selected = dateKey(date) === dateKey(selectedDate);
+                  const status = dayStatus(date);
                   return (
-                    <button key={dateKey(date)} className={`week-day ${selected ? 'selected' : ''} ${day ? 'has-workout' : ''}`} type="button" onClick={() => openCalendarDate(date)}>
+                    <button key={dateKey(date)} className={`week-day ${selected ? 'selected' : ''} ${day ? 'has-workout' : ''} ${status === 'done' ? 'day-done' : status === 'partial' ? 'day-partial' : ''}`} type="button" onClick={() => openCalendarDate(date)}>
                       <span className="week-day-name">{weekDays[index]}</span>
                       <strong>{date.getDate()}</strong>
+                      {status !== 'none' && <span className="day-check">{status === 'done' ? '✓ Completado' : 'En progreso'}</span>}
                       {day ? <><span className="day-type">{day.type}</span><span className="day-exercise-preview">{day.exercises.slice(0, 3).map((exercise) => exercise.name).join(' · ')}{day.exercises.length > 3 ? ` +${day.exercises.length - 3}` : ''}</span></> : <span className="rest-label">Descanso</span>}
                     </button>
                   );
@@ -1571,9 +1676,10 @@ export default function App() {
                   const day = activeTrainingPlan[date.getDay()];
                   const selected = dateKey(date) === dateKey(selectedDate);
                   const inMonth = date.getMonth() === calendarDate.getMonth();
+                  const status = dayStatus(date);
                   return (
-                    <button key={dateKey(date)} className={`month-day ${selected ? 'selected' : ''} ${!inMonth ? 'outside-month' : ''} ${day ? 'has-workout' : ''}`} type="button" onClick={() => openCalendarDate(date)}>
-                      <span className="month-day-number">{date.getDate()}</span>
+                    <button key={dateKey(date)} className={`month-day ${selected ? 'selected' : ''} ${!inMonth ? 'outside-month' : ''} ${day ? 'has-workout' : ''} ${status === 'done' ? 'day-done' : status === 'partial' ? 'day-partial' : ''}`} type="button" onClick={() => openCalendarDate(date)}>
+                      <span className="month-day-number">{date.getDate()}{status === 'done' && <b className="month-check" aria-label="Completado"> ✓</b>}</span>
                       {day && <span className="month-workout-label">{day.type}</span>}
                       {day?.exercises.length ? (
                         <span className="month-exercise-preview">
@@ -1596,6 +1702,14 @@ export default function App() {
                 </div>
                 <span>{selectedDay ? `${selectedDay.exercises.length} ejercicios` : 'Recuperación'}</span>
               </div>
+              {selectedDay && (
+                <div className={`calendar-day-action ${selectedDayCompleted ? 'done' : ''}`}>
+                  <span>{selectedDayCompleted ? '✓ Entrenamiento completado' : `Progreso: ${completedDailyExercises}/${dailyExercises.length} ejercicios`}</span>
+                  <button className="primary-btn" type="button" disabled={!dailyExercises.length} onClick={startWorkout}>
+                    {selectedDayCompleted ? 'Repetir entrenamiento' : isDayStarted(selectedDayLog) ? 'Continuar entrenamiento' : 'Empezar entrenamiento'}
+                  </button>
+                </div>
+              )}
               {selectedDay ? (
                 <div className="calendar-exercise-list">{selectedDay.exercises.map(renderCalendarExercise)}</div>
               ) : (
