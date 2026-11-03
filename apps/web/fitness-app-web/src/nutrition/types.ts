@@ -17,7 +17,7 @@ export const mealTypes: ReadonlyArray<{ id: MealType; label: string }> = [
 export const mealLabel = (id: MealType | undefined) => mealTypes.find((meal) => meal.id === id)?.label ?? 'Comida';
 
 export type NutritionKind = 'protein' | 'water' | 'meal';
-export type EntrySource = 'manual' | 'database' | 'recipe' | 'scanner' | 'text' | 'plan' | 'copy';
+export type EntrySource = 'manual' | 'database' | 'recipe' | 'text' | 'plan' | 'copy';
 
 /** Entrada del diario. Es la misma estructura que usaba el registro rápido original. */
 export type NutritionEntry = {

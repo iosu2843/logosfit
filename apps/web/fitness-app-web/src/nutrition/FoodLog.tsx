@@ -125,7 +125,7 @@ export default function FoodLog({ ctx }: { ctx: NutritionCtx }) {
                   <li key={entry.id}>
                     <div>
                       <strong>{entry.description}</strong>
-                      <small>{round0(macros.calories)} kcal · P {round1(macros.protein)} · C {round1(macros.carbohydrates)} · G {round1(macros.fat)}{entry.source === 'scanner' ? ' · estimado por IA' : ''}</small>
+                      <small>{round0(macros.calories)} kcal · P {round1(macros.protein)} · C {round1(macros.carbohydrates)} · G {round1(macros.fat)}</small>
                     </div>
                     <button type="button" className="nai-icon-btn" aria-label={`Eliminar ${entry.description}`} onClick={() => removeEntry(date, entry.id)}>✕</button>
                   </li>

@@ -3,7 +3,6 @@ import './nutrition.css';
 import Dashboard from './Dashboard';
 import Evolution from './Evolution';
 import FoodLog from './FoodLog';
-import FoodScanner from './FoodScanner';
 import Insights from './Insights';
 import Planner from './Planner';
 import type { NutritionCtx, NutritionProfileInfo } from './ctx';
@@ -13,12 +12,11 @@ import { useNutritionAI } from './store';
 import type { MetricsLike, TrainingDayLike } from './training';
 import type { NutritionEntry, ProgressPoint, Targets } from './types';
 
-type TabId = 'summary' | 'diary' | 'scanner' | 'planner' | 'insights' | 'evolution' | 'quick';
+type TabId = 'summary' | 'diary' | 'planner' | 'insights' | 'evolution' | 'quick';
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'summary', label: 'Resumen' },
   { id: 'diary', label: 'Diario' },
-  { id: 'scanner', label: 'Food Scanner AI' },
   { id: 'planner', label: 'Planificador' },
   { id: 'insights', label: 'Recomendaciones' },
   { id: 'evolution', label: 'Evolución' },
@@ -91,7 +89,6 @@ export default function NutritionModule(props: NutritionModuleProps) {
       <div className="nai-panel" role="tabpanel">
         {tab === 'summary' && <Dashboard ctx={ctx} goTo={goTo} />}
         {tab === 'diary' && <FoodLog ctx={ctx} />}
-        {tab === 'scanner' && <FoodScanner ctx={ctx} />}
         {tab === 'planner' && <Planner ctx={ctx} />}
         {tab === 'insights' && <Insights ctx={ctx} />}
         {tab === 'evolution' && <Evolution ctx={ctx} />}

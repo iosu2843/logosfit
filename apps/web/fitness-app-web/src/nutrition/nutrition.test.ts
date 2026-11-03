@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { addDaysToKey, dayTotals, linearTrend, mifflinBmr, recipePerServing, splitByMeals, suggestTargets, withCarbsForCalories, defaultMealSplit } from './calc';
 import { generateRecommendations, type EngineInput } from './engine';
 import { matchFood, referenceFoods, searchFoods } from './foods';
-import { parseScanResult, rescaleIngredient, scanTotals, createHttpScannerProvider, ScannerError, type ScanIngredient } from './scanner';
 import { adherence, buildBuckets } from './stats';
 import type { NutritionEntry, Targets } from './types';
 
@@ -133,50 +132,5 @@ describe('estadísticas', () => {
   it('calcula cumplimiento', () => {
     const result = adherence(loggedDays(4, 2500), TODAY, 'week', targets);
     expect(result).toEqual({ loggedDays: 4, calorieDays: 4, proteinDays: 4 });
-  });
-});
-
-const sample = (overrides: Partial<ScanIngredient> = {}): ScanIngredient => ({ name: 'Arroz', category: 'ingrediente', grams: 200, calories: 260, protein: 5, carbohydrates: 56, fat: 0.5, ...overrides });
-
-describe('food scanner', () => {
-  it('valida y normaliza la respuesta', () => {
-    const parsed = parseScanResult({ dishName: 'Plato', ingredients: [{ name: 'Pollo', grams: 150, gramsMin: 120, gramsMax: 180, calories: 250, protein: 40, carbohydrates: 0, fat: 8 }], notes: ['Aceite no visible'] });
-    expect(parsed.ingredients[0].category).toBe('ingrediente');
-    expect(parsed.notes).toHaveLength(1);
-  });
-
-  it('rechaza respuestas inválidas', () => {
-    expect(() => parseScanResult(null)).toThrow(ScannerError);
-    expect(() => parseScanResult({ ingredients: [] })).toThrow(ScannerError);
-    expect(() => parseScanResult({ ingredients: [{ name: 'X', grams: -5, calories: 1, protein: 1, carbohydrates: 1, fat: 1 }] })).toThrow(ScannerError);
-    expect(() => parseScanResult({ ingredients: [{ name: 'X', grams: 5, calories: 'mucho', protein: 1, carbohydrates: 1, fat: 1 }] })).toThrow(ScannerError);
-  });
-
-  it('calcula rangos de incertidumbre', () => {
-    const withRange = scanTotals([sample({ gramsMin: 150, gramsMax: 250 })]);
-    expect(withRange.min.calories).toBeCloseTo(195);
-    expect(withRange.max.calories).toBeCloseTo(325);
-    const generic = scanTotals([sample({ category: 'aceite', grams: 10, calories: 88, protein: 0, carbohydrates: 0, fat: 10 })]);
-    expect(generic.usesGenericMargin).toBe(true);
-    expect(generic.min.calories).toBeCloseTo(44);
-    expect(generic.max.calories).toBeCloseTo(132);
-  });
-
-  it('reescala al corregir gramos', () => {
-    const scaled = rescaleIngredient(sample(), 100);
-    expect(scaled.calories).toBe(130);
-    expect(scaled.grams).toBe(100);
-  });
-
-  it('mapea errores HTTP del proveedor', async () => {
-    const image = { base64: 'abc', mimeType: 'image/jpeg' as const };
-    const provider = (status: number, body: unknown = {}) => createHttpScannerProvider({ url: 'https://x.test', fetchImpl: (async () => new Response(JSON.stringify(body), { status })) as typeof fetch });
-    await expect(provider(401).analyze(image)).rejects.toMatchObject({ code: 'unauthorized' });
-    await expect(provider(429).analyze(image)).rejects.toMatchObject({ code: 'rate-limited' });
-    await expect(provider(500).analyze(image)).rejects.toMatchObject({ code: 'server' });
-    const failing = createHttpScannerProvider({ url: 'https://x.test', fetchImpl: (async () => { throw new TypeError('offline'); }) as typeof fetch });
-    await expect(failing.analyze(image)).rejects.toMatchObject({ code: 'network' });
-    const ok = await provider(200, { ingredients: [{ name: 'Pollo', grams: 100, calories: 165, protein: 31, carbohydrates: 0, fat: 3.6 }] }).analyze(image);
-    expect(ok.ingredients).toHaveLength(1);
   });
 });
