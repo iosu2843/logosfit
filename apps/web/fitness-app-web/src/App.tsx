@@ -1,11 +1,28 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { routines } from '@core';
+import { adjustWeight, routines } from '@core';
 import { createRestTimer, formatRestTime, pauseRestTimer, resetRestTimer, startRestTimer, tickRestTimer, type RestTimerState } from '@core';
 import { theme } from '@ui/theme';
-import { equipmentTypes, exerciseLibrary, muscleGroups, type ActivityKind, type EquipmentType, type LibraryExercise, type MuscleGroup } from './exerciseLibrary';
+import { equipmentTypes, exerciseLibrary, muscleGroups, dayTypeOptions, recommendedExercisesFor, type ActivityKind, type EquipmentType, type LibraryExercise, type MuscleGroup } from './exerciseLibrary';
+import MuscleDiagram from './MuscleDiagram';
+import CloudPanel from './CloudPanel';
+import NumInput from './NumInput';
+import { removeItem, saveItem } from './cloud';
 import { analyzeMealDescription, type MacroTotals, type MealAnalysis } from './nutritionAnalyzer';
 
+const nextWeight = adjustWeight({
+  lastWeight: 40,
+  lastReps: 10,
+});
+
+const defaultStats = [
+  { label: 'Calorías', value: '620', unit: 'kcal' },
+  { label: 'Tiempo', value: '38', unit: 'min' },
+  { label: 'Peso', value: '75.4', unit: 'kg' },
+  { label: 'Objetivo', value: '86%', unit: 'cumplido' },
+];
+
 const navItems = ['Usuarios', 'Home', 'Calendario', 'Ejercicios', 'Progreso', 'Nutrición'];
+const navLabels: Record<string, string> = { Home: 'Inicio' };
 const navIcons: Record<string, string> = {
   Usuarios: 'nav-users',
   Home: 'nav-home',
@@ -17,7 +34,7 @@ const navIcons: Record<string, string> = {
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
 
-type CalendarExercise = { name: string; group: MuscleGroup; image?: string; equipment?: EquipmentType; kind?: ActivityKind };
+type CalendarExercise = { name: string; group: MuscleGroup; equipment?: EquipmentType; kind?: ActivityKind };
 type TrainingDay = { name: string; type: string; exercises: CalendarExercise[] };
 type ExerciseMetrics = { sets: number; reps: number; weight: number; level: number; duration: number };
 type ProgressPoint = { id: string; date: string; value: number };
@@ -68,9 +85,6 @@ const emptyProfile: ProfileDraft = {
   limitations: '',
 };
 
-const exerciseImage = (id: string) =>
-  `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${id}/0.jpg`;
-
 function readSavedProfiles(): FitnessProfile[] {
   try {
     const saved = JSON.parse(localStorage.getItem('fitness-profiles') ?? '[]');
@@ -98,65 +112,65 @@ const trainingDays: Record<number, TrainingDay> = {
     name: 'Lunes',
     type: 'Push',
     exercises: [
-      { name: 'Press inclinado máquina', group: 'Pecho', equipment: 'Máquina', image: exerciseImage('Leverage_Incline_Chest_Press') },
-      { name: 'Press inclinado mancuernas', group: 'Pecho', equipment: 'Mancuernas', image: exerciseImage('Incline_Dumbbell_Press') },
-      { name: 'Aperturas máquina', group: 'Pecho', equipment: 'Máquina', image: exerciseImage('Butterfly') },
-      { name: 'Press militar', group: 'Hombros', equipment: 'Barra', image: exerciseImage('Barbell_Shoulder_Press') },
-      { name: 'Elevaciones laterales', group: 'Hombros', equipment: 'Mancuernas', image: exerciseImage('Side_Lateral_Raise') },
-      { name: 'Fondos', group: 'Tríceps', equipment: 'Peso corporal', image: exerciseImage('Dips_-_Triceps_Version') },
-      { name: 'Tríceps polea', group: 'Tríceps', equipment: 'Polea', image: exerciseImage('Triceps_Pushdown') },
+      { name: 'Press inclinado máquina', group: 'Pecho', equipment: 'Máquina' },
+      { name: 'Press inclinado mancuernas', group: 'Pecho', equipment: 'Mancuernas' },
+      { name: 'Aperturas máquina', group: 'Pecho', equipment: 'Máquina' },
+      { name: 'Press militar', group: 'Hombros', equipment: 'Barra' },
+      { name: 'Elevaciones laterales', group: 'Hombros', equipment: 'Mancuernas' },
+      { name: 'Fondos', group: 'Tríceps', equipment: 'Peso corporal' },
+      { name: 'Tríceps polea', group: 'Tríceps', equipment: 'Polea' },
     ],
   },
   2: {
     name: 'Martes',
     type: 'Pull',
     exercises: [
-      { name: 'Jalón al pecho', group: 'Espalda', equipment: 'Polea', image: exerciseImage('Full_Range-Of-Motion_Lat_Pulldown') },
-      { name: 'Remo máquina', group: 'Espalda', equipment: 'Máquina', image: exerciseImage('Leverage_Iso_Row') },
-      { name: 'Remo barra', group: 'Espalda', equipment: 'Barra', image: exerciseImage('Bent_Over_Barbell_Row') },
-      { name: 'Face pull', group: 'Hombros', equipment: 'Polea', image: exerciseImage('Face_Pull') },
-      { name: 'Curl barra', group: 'Bíceps', equipment: 'Barra', image: exerciseImage('Barbell_Curl') },
-      { name: 'Curl mancuernas', group: 'Bíceps', equipment: 'Mancuernas', image: exerciseImage('Dumbbell_Bicep_Curl') },
-      { name: 'Curl inclinado', group: 'Bíceps', equipment: 'Mancuernas', image: exerciseImage('Incline_Dumbbell_Curl') },
+      { name: 'Jalón al pecho', group: 'Espalda', equipment: 'Polea' },
+      { name: 'Remo máquina', group: 'Espalda', equipment: 'Máquina' },
+      { name: 'Remo barra', group: 'Espalda', equipment: 'Barra' },
+      { name: 'Face pull', group: 'Hombros', equipment: 'Polea' },
+      { name: 'Curl barra', group: 'Bíceps', equipment: 'Barra' },
+      { name: 'Curl mancuernas', group: 'Bíceps', equipment: 'Mancuernas' },
+      { name: 'Curl inclinado', group: 'Bíceps', equipment: 'Mancuernas' },
     ],
   },
   4: {
     name: 'Jueves',
     type: 'Push',
     exercises: [
-      { name: 'Press banca', group: 'Pecho', equipment: 'Barra', image: exerciseImage('Barbell_Bench_Press_-_Medium_Grip') },
-      { name: 'Press plano mancuernas', group: 'Pecho', equipment: 'Mancuernas', image: exerciseImage('Dumbbell_Bench_Press') },
-      { name: 'Cruces polea', group: 'Pecho', equipment: 'Polea', image: exerciseImage('Cable_Crossover') },
-      { name: 'Press hombro máquina', group: 'Hombros', equipment: 'Máquina', image: exerciseImage('Leverage_Shoulder_Press') },
-      { name: 'Elevaciones laterales polea', group: 'Hombros', equipment: 'Polea', image: exerciseImage('Cable_Seated_Lateral_Raise') },
-      { name: 'Tríceps overhead', group: 'Tríceps', equipment: 'Polea', image: exerciseImage('Cable_Rope_Overhead_Triceps_Extension') },
-      { name: 'Patada tríceps', group: 'Tríceps', equipment: 'Mancuernas', image: asset('exercises/triceps-kickback.svg') },
+      { name: 'Press banca', group: 'Pecho', equipment: 'Barra' },
+      { name: 'Press plano mancuernas', group: 'Pecho', equipment: 'Mancuernas' },
+      { name: 'Cruces polea', group: 'Pecho', equipment: 'Polea' },
+      { name: 'Press hombro máquina', group: 'Hombros', equipment: 'Máquina' },
+      { name: 'Elevaciones laterales polea', group: 'Hombros', equipment: 'Polea' },
+      { name: 'Tríceps overhead', group: 'Tríceps', equipment: 'Polea' },
+      { name: 'Patada tríceps', group: 'Tríceps', equipment: 'Mancuernas' },
     ],
   },
   5: {
     name: 'Viernes',
     type: 'Piernas',
     exercises: [
-      { name: 'Prensa', group: 'Cuádriceps', equipment: 'Máquina', image: exerciseImage('Leg_Press') },
-      { name: 'Extensión cuádriceps', group: 'Cuádriceps', equipment: 'Máquina', image: exerciseImage('Leg_Extensions') },
-      { name: 'Curl femoral tumbado', group: 'Isquiotibiales', equipment: 'Máquina', image: exerciseImage('Lying_Leg_Curls') },
-      { name: 'Curl femoral sentado', group: 'Isquiotibiales', equipment: 'Máquina', image: exerciseImage('Seated_Leg_Curl') },
-      { name: 'Hip thrust máquina', group: 'Glúteos', equipment: 'Máquina', image: exerciseImage('Barbell_Hip_Thrust') },
-      { name: 'Gemelos prensa', group: 'Gemelos', equipment: 'Máquina', image: exerciseImage('Calf_Press_On_The_Leg_Press_Machine') },
-      { name: 'Abducciones', group: 'Glúteos', equipment: 'Máquina', image: asset('exercises/hip-abduction.svg') },
+      { name: 'Prensa', group: 'Cuádriceps', equipment: 'Máquina' },
+      { name: 'Extensión cuádriceps', group: 'Cuádriceps', equipment: 'Máquina' },
+      { name: 'Curl femoral tumbado', group: 'Isquiotibiales', equipment: 'Máquina' },
+      { name: 'Curl femoral sentado', group: 'Isquiotibiales', equipment: 'Máquina' },
+      { name: 'Hip thrust máquina', group: 'Glúteos', equipment: 'Máquina' },
+      { name: 'Gemelos prensa', group: 'Gemelos', equipment: 'Máquina' },
+      { name: 'Abducciones', group: 'Glúteos', equipment: 'Máquina' },
     ],
   },
   6: {
     name: 'Sábado',
     type: 'Pull',
     exercises: [
-      { name: 'Dominadas/jalón', group: 'Espalda', equipment: 'Peso corporal', image: exerciseImage('Pullups') },
-      { name: 'Remo polea baja', group: 'Espalda', equipment: 'Polea', image: exerciseImage('Seated_Cable_Rows') },
-      { name: 'Pullover máquina', group: 'Espalda', equipment: 'Máquina', image: exerciseImage('Straight-Arm_Pulldown') },
-      { name: 'Pájaros', group: 'Hombros', equipment: 'Mancuernas', image: exerciseImage('Bent_Over_Dumbbell_Rear_Delt_Raise_With_Head_On_Bench') },
-      { name: 'Curl polea', group: 'Bíceps', equipment: 'Polea', image: exerciseImage('Standing_Biceps_Cable_Curl') },
-      { name: 'Curl martillo', group: 'Bíceps', equipment: 'Mancuernas', image: exerciseImage('Hammer_Curls') },
-      { name: 'Curl concentrado', group: 'Bíceps', equipment: 'Mancuernas', image: exerciseImage('Concentration_Curls') },
+      { name: 'Dominadas/jalón', group: 'Espalda', equipment: 'Peso corporal' },
+      { name: 'Remo polea baja', group: 'Espalda', equipment: 'Polea' },
+      { name: 'Pullover máquina', group: 'Espalda', equipment: 'Máquina' },
+      { name: 'Pájaros', group: 'Hombros', equipment: 'Mancuernas' },
+      { name: 'Curl polea', group: 'Bíceps', equipment: 'Polea' },
+      { name: 'Curl martillo', group: 'Bíceps', equipment: 'Mancuernas' },
+      { name: 'Curl concentrado', group: 'Bíceps', equipment: 'Mancuernas' },
     ],
   },
 };
@@ -370,10 +384,6 @@ export default function App() {
   const profileScopeId = activeProfile?.id ?? '__guest__';
   const exerciseMetrics = exerciseMetricsByProfile[profileScopeId] ?? {};
   const activeTrainingPlan = trainingPlansByProfile[profileScopeId] ?? trainingDays;
-  const nextWorkout = Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(new Date(), index + 1);
-    return { date, day: activeTrainingPlan[date.getDay()] };
-  }).find(({ day }) => day?.exercises.length);
   const progressHistory = progressHistoryByProfile[profileScopeId] ?? { bodyWeight: [], exerciseLoads: {} };
   const nutritionData = nutritionByProfile[profileScopeId] ?? defaultNutritionData(activeProfile);
   const nutritionEntriesToday = nutritionData.entriesByDay[localDateKey()] ?? [];
@@ -402,6 +412,14 @@ export default function App() {
     ? progressBodyWeightDraft
     : activeProfile?.weight ?? '';
   const completed = completedByProfile[profileScopeId] ?? (profileScopeId === '__guest__' ? { 'Bench Press': true } : {});
+  const stats = activeProfile
+    ? [
+        { label: 'Peso actual', value: activeProfile.weight || '--', unit: 'kg' },
+        { label: 'Altura', value: activeProfile.height || '--', unit: 'cm' },
+        { label: 'Edad', value: activeProfile.age || '--', unit: 'años' },
+        { label: 'Peso objetivo', value: activeProfile.goalWeight || '--', unit: 'kg' },
+      ]
+    : defaultStats;
 
   useEffect(() => {
     if (!restTimer.isRunning) return;
@@ -426,7 +444,7 @@ export default function App() {
     if (nextCount >= plannedSets) {
       setCompletedByProfile((current) => {
         const next = { ...current, [profileScopeId]: { ...completed, [exercise.name]: true } };
-        localStorage.setItem('fitness-completed-exercises-by-profile', JSON.stringify(next));
+        saveItem('fitness-completed-exercises-by-profile', JSON.stringify(next));
         return next;
       });
     }
@@ -458,7 +476,7 @@ export default function App() {
           [selectedExercise.name]: !completed[selectedExercise.name],
         },
       };
-      localStorage.setItem('fitness-completed-exercises-by-profile', JSON.stringify(next));
+      saveItem('fitness-completed-exercises-by-profile', JSON.stringify(next));
       return next;
     });
   };
@@ -467,7 +485,7 @@ export default function App() {
     setNutritionByProfile((current) => {
       const updatedProfileData = update(current[profileScopeId] ?? defaultNutritionData(activeProfile));
       const next = { ...current, [profileScopeId]: updatedProfileData };
-      localStorage.setItem('fitness-nutrition-by-profile', JSON.stringify(next));
+      saveItem('fitness-nutrition-by-profile', JSON.stringify(next));
       return next;
     });
   };
@@ -543,7 +561,7 @@ export default function App() {
           bodyWeight: upsertProgressPoint(profileHistory.bodyWeight, point),
         },
       };
-      localStorage.setItem('fitness-progress-history-by-profile', JSON.stringify(next));
+      saveItem('fitness-progress-history-by-profile', JSON.stringify(next));
       return next;
     });
     setProgressBodyWeightDraft(String(value));
@@ -552,7 +570,7 @@ export default function App() {
     if (activeProfile) {
       const nextProfiles = profiles.map((profile) => profile.id === activeProfile.id ? { ...profile, weight: String(value) } : profile);
       setProfiles(nextProfiles);
-      localStorage.setItem('fitness-profiles', JSON.stringify(nextProfiles));
+      saveItem('fitness-profiles', JSON.stringify(nextProfiles));
     }
   };
 
@@ -578,7 +596,7 @@ export default function App() {
           },
         },
       };
-      localStorage.setItem('fitness-progress-history-by-profile', JSON.stringify(next));
+      saveItem('fitness-progress-history-by-profile', JSON.stringify(next));
       return next;
     });
   };
@@ -598,7 +616,7 @@ export default function App() {
     setProgressExerciseName('');
     setProteinDraft('');
     setWaterDraft('');
-    localStorage.setItem('fitness-active-profile', profile.id);
+    saveItem('fitness-active-profile', profile.id);
   };
 
   const startNewProfile = () => {
@@ -621,8 +639,8 @@ export default function App() {
     setEditingProfileId(profile.id);
     setProfileDraft(profileDraftFrom(profile));
     setProgressDraftProfileId('');
-    localStorage.setItem('fitness-profiles', JSON.stringify(nextProfiles));
-    localStorage.setItem('fitness-active-profile', profile.id);
+    saveItem('fitness-profiles', JSON.stringify(nextProfiles));
+    saveItem('fitness-active-profile', profile.id);
   };
 
   const deleteProfile = () => {
@@ -636,15 +654,15 @@ export default function App() {
     setProfileDraft(nextActiveProfile ? profileDraftFrom(nextActiveProfile) : { ...emptyProfile });
     setProgressDraftProfileId('');
     setProgressExerciseName('');
-    localStorage.setItem('fitness-profiles', JSON.stringify(nextProfiles));
+    saveItem('fitness-profiles', JSON.stringify(nextProfiles));
     if (nextActiveProfile) {
-      localStorage.setItem('fitness-active-profile', nextActiveProfile.id);
+      saveItem('fitness-active-profile', nextActiveProfile.id);
     } else {
-      localStorage.removeItem('fitness-active-profile');
+      removeItem('fitness-active-profile');
     }
   };
 
-  const currentTitle = activeNav === 'Progreso' ? 'Progreso' : activeNav === 'Nutrición' ? 'Nutrición' : 'Home';
+  const currentTitle = activeNav === 'Progreso' ? 'Progreso' : activeNav === 'Nutrición' ? 'Nutrición' : 'Inicio';
   const weekStart = startOfWeek(calendarDate);
   const visibleWeek = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const monthStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
@@ -662,6 +680,13 @@ export default function App() {
     { label: 'Series previstas', value: String(plannedDailySets) },
     { label: 'Completados', value: selectedDay ? `${completedDailyExercises}/${dailyExercises.length}` : '—' },
   ];
+  const nextWorkout = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(new Date(), index + 1);
+    return { date, day: activeTrainingPlan[date.getDay()] };
+  }).find(({ day }) => day?.exercises.length);
+  const nextWorkoutDateLabel = nextWorkout
+    ? new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(nextWorkout.date)
+    : '';
 
   const groupedLibrary = muscleGroups
     .filter((group) => muscleFilter === 'Todos' || group === muscleFilter)
@@ -675,21 +700,40 @@ export default function App() {
     }))
     .filter(({ exercises }) => exercises.length > 0);
 
-  const saveTrainingDay = (dayIndex: number, exercises: CalendarExercise[]) => {
+  const saveTrainingDay = (dayIndex: number, exercises: CalendarExercise[], type?: string) => {
     const nextPlan = { ...activeTrainingPlan };
-    if (exercises.length === 0) {
+    if (exercises.length === 0 && !type) {
       delete nextPlan[dayIndex];
     } else {
       const previousDay = nextPlan[dayIndex];
       nextPlan[dayIndex] = {
         name: previousDay?.name ?? weekdayNames[dayIndex],
-        type: previousDay?.type ?? 'Personalizado',
+        type: type ?? previousDay?.type ?? 'Personalizado',
         exercises,
       };
     }
     const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
     setTrainingPlansByProfile(nextByProfile);
-    localStorage.setItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+    saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+  };
+
+  const changeDayType = (type: string) => {
+    saveTrainingDay(editorDayIndex, editorDay?.exercises ?? [], type);
+  };
+
+  const copyRoutineToDay = (targetDayIndex: number) => {
+    const source = editorDay;
+    if (!source?.exercises.length) return;
+    const nextPlan = { ...activeTrainingPlan };
+    nextPlan[targetDayIndex] = {
+      name: weekdayNames[targetDayIndex],
+      type: source.type,
+      exercises: source.exercises.map((exercise) => ({ ...exercise })),
+    };
+    const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
+    setTrainingPlansByProfile(nextByProfile);
+    saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+    setEditorDayIndex(targetDayIndex);
   };
 
   const addLibraryExercise = (exercise: LibraryExercise) => {
@@ -712,7 +756,7 @@ export default function App() {
           [key]: { ...getMetrics(exerciseMetrics, exercise), [field]: value },
         },
       };
-      localStorage.setItem('fitness-calendar-metrics-by-profile', JSON.stringify(next));
+      saveItem('fitness-calendar-metrics-by-profile', JSON.stringify(next));
       return next;
     });
   };
@@ -738,11 +782,7 @@ export default function App() {
     const metrics = getMetrics(exerciseMetrics, exercise);
     return (
       <article className="calendar-exercise" key={exercise.name}>
-        {exercise.image ? (
-          <img className="exercise-image" src={exercise.image} alt={exercise.name} loading="lazy" />
-        ) : (
-          <div className="exercise-image-placeholder" aria-hidden="true">{exercise.group.slice(0, 2).toUpperCase()}</div>
-        )}
+        <MuscleDiagram exercise={exercise} />
         <div className="calendar-exercise-info">
           <span className="exercise-group">{exercise.group}</span>
           <h3>{exercise.name}</h3>
@@ -751,26 +791,26 @@ export default function App() {
               <>
                 <label>
                   Nivel <span>1-10</span>
-                  <input aria-label={`Nivel de cardio para ${exercise.name}`} type="number" min="1" max="10" value={metrics.level} onChange={(event) => changeExerciseMetric(exercise, 'level', Math.min(10, Math.max(1, Number(event.target.value))))} />
+                  <NumInput aria-label={`Nivel de cardio para ${exercise.name}`} min="1" max="10" value={metrics.level} onChange={(event) => changeExerciseMetric(exercise, 'level', Math.min(10, Math.max(1, Number(event.target.value))))} />
                 </label>
                 <label>
                   Tiempo <span>min</span>
-                  <input aria-label={`Tiempo de cardio para ${exercise.name}`} type="number" min="1" max="300" value={metrics.duration} onChange={(event) => changeExerciseMetric(exercise, 'duration', Math.max(1, Number(event.target.value)))} />
+                  <NumInput aria-label={`Tiempo de cardio para ${exercise.name}`} min="1" max="300" value={metrics.duration} onChange={(event) => changeExerciseMetric(exercise, 'duration', Math.max(1, Number(event.target.value)))} />
                 </label>
               </>
             ) : (
               <>
                 <label>
                   Series
-                  <input aria-label={`Series para ${exercise.name}`} type="number" min="1" max="20" value={metrics.sets} onChange={(event) => changeExerciseMetric(exercise, 'sets', Math.max(1, Number(event.target.value)))} />
+                  <NumInput aria-label={`Series para ${exercise.name}`} min="1" max="20" value={metrics.sets} onChange={(event) => changeExerciseMetric(exercise, 'sets', Math.max(1, Number(event.target.value)))} />
                 </label>
                 <label>
                   Reps
-                  <input aria-label={`Repeticiones para ${exercise.name}`} type="number" min="1" max="100" value={metrics.reps} onChange={(event) => changeExerciseMetric(exercise, 'reps', Math.max(1, Number(event.target.value)))} />
+                  <NumInput aria-label={`Repeticiones para ${exercise.name}`} min="1" max="100" value={metrics.reps} onChange={(event) => changeExerciseMetric(exercise, 'reps', Math.max(1, Number(event.target.value)))} />
                 </label>
                 <label>
                   Peso <span>kg</span>
-                  <input aria-label={`Peso en kilogramos para ${exercise.name}`} type="number" min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} />
+                  <NumInput aria-label={`Peso en kilogramos para ${exercise.name}`} min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} />
                 </label>
               </>
             )}
@@ -831,13 +871,13 @@ export default function App() {
           </button>
         </div>
 
-        <nav className="nav-list" id="main-sidebar-menu" aria-label="Main navigation">
+        <nav className="nav-list" id="main-sidebar-menu" aria-label="Navegación principal">
           {navItems.map((item) => (
             <button
               key={item}
               className={`nav-item ${activeNav === item ? 'active' : ''}`}
-              aria-label={item}
-              title={item}
+              aria-label={navLabels[item] ?? item}
+              title={navLabels[item] ?? item}
               onClick={() => {
                 setActiveNav(item);
                 setScreen('overview');
@@ -850,33 +890,15 @@ export default function App() {
               <svg className="nav-item-icon" aria-hidden="true" width="20" height="20">
                 <use href={`${asset('nav-icons.svg')}#${navIcons[item]}`} />
               </svg>
-              <span className="nav-item-label">{item}</span>
+              <span className="nav-item-label">{navLabels[item] ?? item}</span>
             </button>
           ))}
         </nav>
 
         <div className="mini-card" style={{ background: '#121212' }}>
-          <p className="eyebrow muted">Próximo entrenamiento</p>
-          {nextWorkout ? (
-            <>
-              <h3>{nextWorkout.day.name}</h3>
-              <small className="next-workout-date">
-                {new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).format(nextWorkout.date)} · {nextWorkout.day.type}
-              </small>
-              <p className="next-workout-preview">
-                {nextWorkout.day.exercises.slice(0, 3).map((exercise) => exercise.name).join(' · ')}
-                {nextWorkout.day.exercises.length > 3 ? ` +${nextWorkout.day.exercises.length - 3}` : ''}
-              </p>
-              <button className="next-workout-link" type="button" onClick={() => { openCalendarDate(nextWorkout.date); setActiveNav('Calendario'); }}>
-                Ver plan
-              </button>
-            </>
-          ) : (
-            <>
-              <h3>Sin sesiones</h3>
-              <small>No hay entrenamientos programados para los próximos 7 días.</small>
-            </>
-          )}
+          <p className="eyebrow muted">Próxima carga</p>
+          <h3>{nextWeight} kg</h3>
+          <small>Aumento sugerido según la última sesión</small>
         </div>
       </aside>
 
@@ -906,7 +928,7 @@ export default function App() {
                     return (
                       <article className={`session-exercise ${isComplete ? 'complete' : ''}`} key={exercise.name}>
                         <div className="session-exercise-heading">
-                          {exercise.image ? <img className="session-exercise-image" src={exercise.image} alt={exercise.name} /> : <div className="session-exercise-image-placeholder">{exercise.group.slice(0, 2).toUpperCase()}</div>}
+                          <MuscleDiagram exercise={exercise} size="sm" />
                           <div className="session-exercise-title">
                             <span className="exercise-group">{exercise.group}</span>
                             <h2>{exercise.name}</h2>
@@ -917,15 +939,15 @@ export default function App() {
 
                         {exercise.kind === 'cardio' ? (
                           <div className="session-cardio-metrics">
-                            <label>Nivel 1-10<input aria-label={`Nivel de ${exercise.name}`} type="number" min="1" max="10" value={metrics.level} onChange={(event) => changeExerciseMetric(exercise, 'level', Math.min(10, Math.max(1, Number(event.target.value))))} /></label>
-                            <label>Tiempo min<input aria-label={`Tiempo de ${exercise.name}`} type="number" min="1" max="300" value={metrics.duration} onChange={(event) => changeExerciseMetric(exercise, 'duration', Math.max(1, Number(event.target.value)))} /></label>
+                            <label>Nivel 1-10<NumInput aria-label={`Nivel de ${exercise.name}`} min="1" max="10" value={metrics.level} onChange={(event) => changeExerciseMetric(exercise, 'level', Math.min(10, Math.max(1, Number(event.target.value))))} /></label>
+                            <label>Tiempo min<NumInput aria-label={`Tiempo de ${exercise.name}`} min="1" max="300" value={metrics.duration} onChange={(event) => changeExerciseMetric(exercise, 'duration', Math.max(1, Number(event.target.value)))} /></label>
                           </div>
                         ) : (
                           <div className="session-strength-metrics">
                             <span>{metrics.sets} series · {metrics.reps} reps planificadas</span>
                             <label>
                               Peso utilizado
-                              <span className="session-weight-input"><input aria-label={`Peso utilizado en ${exercise.name}`} type="number" min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} /><small>kg</small></span>
+                              <span className="session-weight-input"><NumInput aria-label={`Peso utilizado en ${exercise.name}`} min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} /><small>kg</small></span>
                             </label>
                           </div>
                         )}
@@ -1025,7 +1047,7 @@ export default function App() {
                   <label>
                     Carga utilizada
                     <span className="progress-input-unit">
-                      <input aria-label={`Carga actual de ${selectedProgressExercise.name}`} type="number" min="0" max="999" step="0.5" value={selectedProgressMetrics.weight} onChange={(event) => changeExerciseMetric(selectedProgressExercise, 'weight', Math.max(0, Number(event.target.value)))} />
+                      <NumInput aria-label={`Carga actual de ${selectedProgressExercise.name}`} min="0" max="999" step="0.5" value={selectedProgressMetrics.weight} onChange={(event) => changeExerciseMetric(selectedProgressExercise, 'weight', Math.max(0, Number(event.target.value)))} />
                       <small>kg</small>
                     </span>
                   </label>
@@ -1086,7 +1108,7 @@ export default function App() {
                 </div>
                 <label className="nutrition-target-field">
                   Objetivo diario
-                  <span><input aria-label="Objetivo diario de proteína en gramos" type="number" min="1" max="1000" value={nutritionData.proteinGoalGrams} onChange={(event) => updateNutritionGoal('proteinGoalGrams', Number(event.target.value))} /> g</span>
+                  <span><NumInput aria-label="Objetivo diario de proteína en gramos" min="1" max="1000" value={nutritionData.proteinGoalGrams} onChange={(event) => updateNutritionGoal('proteinGoalGrams', Number(event.target.value))} /> g</span>
                 </label>
                 <form className="nutrition-intake-form" onSubmit={(event) => { event.preventDefault(); recordNutritionIntake('protein', proteinDraft); }}>
                   <label>
@@ -1110,7 +1132,7 @@ export default function App() {
                 </div>
                 <label className="nutrition-target-field">
                   Objetivo diario
-                  <span><input aria-label="Objetivo diario de agua en mililitros" type="number" min="250" max="10000" step="250" value={nutritionData.waterGoalMl} onChange={(event) => updateNutritionGoal('waterGoalMl', Number(event.target.value))} /> ml</span>
+                  <span><NumInput aria-label="Objetivo diario de agua en mililitros" min="250" max="10000" step="250" value={nutritionData.waterGoalMl} onChange={(event) => updateNutritionGoal('waterGoalMl', Number(event.target.value))} /> ml</span>
                 </label>
                 <form className="nutrition-intake-form" onSubmit={(event) => { event.preventDefault(); recordNutritionIntake('water', waterDraft); }}>
                   <label>
@@ -1227,6 +1249,7 @@ export default function App() {
                 ) : (
                   <p className="profile-empty-state">Aún no hay perfiles.</p>
                 )}
+                <CloudPanel />
               </section>
 
               <form className="profile-editor" onSubmit={saveProfile} style={{ background: theme.card }}>
@@ -1344,6 +1367,24 @@ export default function App() {
                   {editorDays.map((day) => <option key={day.index} value={day.index}>{day.name}</option>)}
                 </select>
               </label>
+              <label className="editor-day-field">
+                <span>Tipo de día</span>
+                <select aria-label="Tipo de día del plan" value={editorDay?.type ?? 'Personalizado'} onChange={(event) => changeDayType(event.target.value)}>
+                  {dayTypeOptions.map((type) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </label>
+              <label className="editor-day-field">
+                <span>Copiar rutina a</span>
+                <select
+                  aria-label="Copiar la rutina de este día a otro"
+                  disabled={!editorDay?.exercises.length}
+                  value=""
+                  onChange={(event) => { if (event.target.value) copyRoutineToDay(Number(event.target.value)); }}
+                >
+                  <option value="">Elegir día…</option>
+                  {editorDays.filter((day) => day.index !== editorDayIndex).map((day) => <option key={day.index} value={day.index}>{day.name}</option>)}
+                </select>
+              </label>
               <p>Los cambios se guardan para {activeProfile?.name ?? 'este dispositivo'} y se reflejan en el calendario.</p>
             </div>
 
@@ -1372,14 +1413,14 @@ export default function App() {
                           </div>
                           {exercise.kind === 'cardio' ? (
                             <div className="editor-plan-metrics cardio-plan-metrics">
-                              <label>Nivel 1-10<input aria-label={`Nivel de cardio de ${exercise.name}`} type="number" min="1" max="10" value={metrics.level} onChange={(event) => changeExerciseMetric(exercise, 'level', Math.min(10, Math.max(1, Number(event.target.value))))} /></label>
-                              <label>Tiempo min<input aria-label={`Tiempo de cardio de ${exercise.name}`} type="number" min="1" max="300" value={metrics.duration} onChange={(event) => changeExerciseMetric(exercise, 'duration', Math.max(1, Number(event.target.value)))} /></label>
+                              <label>Nivel 1-10<NumInput aria-label={`Nivel de cardio de ${exercise.name}`} min="1" max="10" value={metrics.level} onChange={(event) => changeExerciseMetric(exercise, 'level', Math.min(10, Math.max(1, Number(event.target.value))))} /></label>
+                              <label>Tiempo min<NumInput aria-label={`Tiempo de cardio de ${exercise.name}`} min="1" max="300" value={metrics.duration} onChange={(event) => changeExerciseMetric(exercise, 'duration', Math.max(1, Number(event.target.value)))} /></label>
                             </div>
                           ) : (
                             <div className="editor-plan-metrics">
-                              <label>Series<input aria-label={`Series de ${exercise.name}`} type="number" min="1" max="20" value={metrics.sets} onChange={(event) => changeExerciseMetric(exercise, 'sets', Math.max(1, Number(event.target.value)))} /></label>
-                              <label>Reps<input aria-label={`Repeticiones de ${exercise.name}`} type="number" min="1" max="100" value={metrics.reps} onChange={(event) => changeExerciseMetric(exercise, 'reps', Math.max(1, Number(event.target.value)))} /></label>
-                              <label>Peso kg<input aria-label={`Peso de ${exercise.name}`} type="number" min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} /></label>
+                              <label>Series<NumInput aria-label={`Series de ${exercise.name}`} min="1" max="20" value={metrics.sets} onChange={(event) => changeExerciseMetric(exercise, 'sets', Math.max(1, Number(event.target.value)))} /></label>
+                              <label>Reps<NumInput aria-label={`Repeticiones de ${exercise.name}`} min="1" max="100" value={metrics.reps} onChange={(event) => changeExerciseMetric(exercise, 'reps', Math.max(1, Number(event.target.value)))} /></label>
+                              <label>Peso kg<NumInput aria-label={`Peso de ${exercise.name}`} min="0" max="999" step="0.5" value={metrics.weight} onChange={(event) => changeExerciseMetric(exercise, 'weight', Math.max(0, Number(event.target.value)))} /></label>
                             </div>
                           )}
                         </article>
@@ -1398,6 +1439,29 @@ export default function App() {
                     <h2>Repertorio</h2>
                   </div>
                 </div>
+
+                {(() => {
+                  const recommended = recommendedExercisesFor(editorDay?.type ?? '', 10)
+                    .filter((exercise) => !editorDay?.exercises.some((item) => item.name === exercise.name));
+                  if (recommended.length === 0) return null;
+                  return (
+                    <section className="library-recommended">
+                      <p className="eyebrow muted">Recomendados para {editorDay?.type}</p>
+                      <div className="library-recommended-list">
+                        {recommended.map((exercise) => (
+                          <article className="library-exercise-row" key={exercise.name}>
+                            <div>
+                              <strong>{exercise.name}</strong>
+                              <small>{exercise.group} · {exercise.equipment}</small>
+                            </div>
+                            <button className="editor-add-button" type="button" onClick={() => addLibraryExercise(exercise)}>Añadir</button>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })()}
+
                 <div className="library-filters">
                   <input aria-label="Buscar ejercicio" type="search" placeholder="Buscar ejercicio" value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} />
                   <select aria-label="Filtrar por grupo o actividad" value={muscleFilter} onChange={(event) => setMuscleFilter(event.target.value as MuscleGroup | 'Todos')}>
@@ -1510,7 +1574,7 @@ export default function App() {
           <>
             <header className="topbar">
               <div>
-                <p className="eyebrow">{activeProfile?.goal || 'Resumen personal'}</p>
+                <p className="eyebrow">{activeProfile?.name ?? 'Invitado'}</p>
                 <h1>{currentTitle}</h1>
               </div>
               <button className="primary-btn" type="button" disabled={!selectedDay?.exercises.length} onClick={startWorkout}>
@@ -1518,11 +1582,44 @@ export default function App() {
               </button>
             </header>
 
+            <section
+              className="hero-card"
+              style={{ background: `linear-gradient(135deg, ${theme.accent}, #ff9d3d)` }}
+            >
+              <div>
+                <p className="eyebrow hero-eyebrow">Próximo entrenamiento</p>
+                {nextWorkout ? (
+                  <>
+                    <h2>{nextWorkout.day.name} · {nextWorkout.day.type}</h2>
+                    <p>{nextWorkoutDateLabel} · {nextWorkout.day.exercises.map((exercise) => exercise.name).slice(0, 3).join(' · ')}{nextWorkout.day.exercises.length > 3 ? ` +${nextWorkout.day.exercises.length - 3}` : ''}</p>
+                  </>
+                ) : (
+                  <>
+                    <h2>Sin sesiones programadas</h2>
+                    <p>Configura tu plan semanal en el editor de ejercicios.</p>
+                  </>
+                )}
+              </div>
+              <button className="hero-link" type="button" onClick={() => setActiveNav('Calendario')}>Ver plan</button>
+            </section>
+
             <section className="stats-grid daily-summary-grid" aria-label="Resumen del día">
               {dailySummaryStats.map((stat) => (
-                <div key={stat.label} className="stat-card daily-summary-card" style={{ background: theme.card }}>
+                <div key={stat.label} className="stat-card summary-stat-card" style={{ background: theme.card }}>
                   <span>{stat.label}</span>
                   <strong>{stat.value}</strong>
+                </div>
+              ))}
+            </section>
+
+            <section className="stats-grid">
+              {stats.map((stat) => (
+                <div key={stat.label} className="stat-card" style={{ background: theme.card }}>
+                  <span>{stat.label}</span>
+                  <strong>
+                    {stat.value}
+                    <small>{stat.unit}</small>
+                  </strong>
                 </div>
               ))}
             </section>
@@ -1537,6 +1634,7 @@ export default function App() {
                     <h3>Plan diario</h3>
                   </div>
                   <div className="daily-plan-heading-actions">
+                    <span>{selectedDay ? `${selectedDay.type} · ${selectedDay.exercises.length} ejercicios` : 'Descanso'}</span>
                     <button className="daily-plan-link" type="button" onClick={() => setActiveNav('Calendario')}>
                       Ver calendario
                     </button>
@@ -1549,11 +1647,7 @@ export default function App() {
                       const metrics = getMetrics(exerciseMetrics, exercise);
                       return (
                         <article className="daily-plan-exercise" key={exercise.name}>
-                          {exercise.image ? (
-                            <img className="daily-plan-image" src={exercise.image} alt={exercise.name} loading="lazy" />
-                          ) : (
-                            <div className="daily-plan-image-placeholder" aria-hidden="true">{exercise.group.slice(0, 2).toUpperCase()}</div>
-                          )}
+                          <MuscleDiagram exercise={exercise} size="sm" />
                           <div className="daily-plan-exercise-info">
                             <span className="exercise-group">{exercise.group}</span>
                             <strong>{exercise.name}</strong>

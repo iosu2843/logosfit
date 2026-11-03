@@ -259,3 +259,37 @@ export const exerciseLibrary: LibraryExercise[] = muscleGroups.flatMap((group) =
     kind: exercise.kind ?? (group === 'Cardio' ? 'cardio' : 'strength'),
   })),
 );
+
+export const dayTypeOptions = ['Push', 'Pull', 'Piernas', 'Brazo', 'Pecho', 'Hombro', 'Cardio', 'Full body', 'Personalizado'] as const;
+export type DayType = (typeof dayTypeOptions)[number];
+
+const dayTypeGroups: Record<DayType, MuscleGroup[]> = {
+  Push: ['Pecho', 'Hombros', 'Tríceps'],
+  Pull: ['Espalda', 'Bíceps', 'Hombros'],
+  Piernas: ['Cuádriceps', 'Isquiotibiales', 'Glúteos', 'Gemelos'],
+  Brazo: ['Bíceps', 'Tríceps', 'Antebrazos'],
+  Pecho: ['Pecho'],
+  Hombro: ['Hombros'],
+  Cardio: ['Cardio'],
+  'Full body': ['Pecho', 'Espalda', 'Cuádriceps', 'Glúteos', 'Hombros'],
+  Personalizado: [],
+};
+
+/** Grupos musculares asociados a un tipo de día (vacío si es personalizado). */
+export function groupsForDayType(type: string): MuscleGroup[] {
+  return dayTypeGroups[type as DayType] ?? [];
+}
+
+/** Ejercicios recomendados para un tipo de día, repartidos entre sus grupos musculares. */
+export function recommendedExercisesFor(type: string, limit = 12): LibraryExercise[] {
+  const groups = groupsForDayType(type);
+  if (groups.length === 0) return [];
+  const queues = groups.map((group) => exerciseLibrary.filter((exercise) => exercise.group === group));
+  const result: LibraryExercise[] = [];
+  for (let index = 0; result.length < limit && queues.some((queue) => index < queue.length); index += 1) {
+    for (const queue of queues) {
+      if (index < queue.length && result.length < limit) result.push(queue[index]);
+    }
+  }
+  return result;
+}
