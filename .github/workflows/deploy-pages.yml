@@ -34,6 +34,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_FOOD_SCANNER_URL: ${{ secrets.VITE_FOOD_SCANNER_URL }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

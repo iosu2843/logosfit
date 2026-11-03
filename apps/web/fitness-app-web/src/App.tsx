@@ -7,7 +7,9 @@ import MuscleDiagram from './MuscleDiagram';
 import CloudPanel from './CloudPanel';
 import NumInput from './NumInput';
 import { removeItem, saveItem } from './cloud';
-import { analyzeMealDescription, type MacroTotals, type MealAnalysis } from './nutritionAnalyzer';
+import { analyzeMealDescription, type MealAnalysis } from './nutritionAnalyzer';
+import NutritionModule from './nutrition/NutritionModule';
+import type { NutritionEntry, NutritionKind, NutritionProfileData } from './nutrition/types';
 
 const nextWeight = adjustWeight({
   lastWeight: 40,
@@ -39,13 +41,6 @@ type TrainingDay = { name: string; type: string; exercises: CalendarExercise[] }
 type ExerciseMetrics = { sets: number; reps: number; weight: number; level: number; duration: number };
 type ProgressPoint = { id: string; date: string; value: number };
 type ProfileProgressHistory = { bodyWeight: ProgressPoint[]; exerciseLoads: Record<string, ProgressPoint[]> };
-type NutritionKind = 'protein' | 'water' | 'meal';
-type NutritionEntry = { id: string; timestamp: string; kind: NutritionKind; amount: number; description?: string; macros?: MacroTotals; foods?: string[] };
-type NutritionProfileData = {
-  proteinGoalGrams: number;
-  waterGoalMl: number;
-  entriesByDay: Record<string, NutritionEntry[]>;
-};
 type FitnessProfile = {
   id: string;
   name: string;
@@ -490,6 +485,20 @@ export default function App() {
     });
   };
 
+  const addNutritionEntries = (date: string, entries: NutritionEntry[]) => {
+    if (entries.length === 0) return;
+    updateNutritionData((current) => ({
+      ...current,
+      entriesByDay: { ...current.entriesByDay, [date]: [...(current.entriesByDay[date] ?? []), ...entries] },
+    }));
+  };
+
+  const removeNutritionEntry = (date: string, id: string) => {
+    updateNutritionData((current) => ({
+      ...current,
+      entriesByDay: { ...current.entriesByDay, [date]: (current.entriesByDay[date] ?? []).filter((entry) => entry.id !== id) },
+    }));
+  };
   const updateNutritionGoal = (goal: 'proteinGoalGrams' | 'waterGoalMl', value: number) => {
     if (!Number.isFinite(value) || value < 1) return;
     updateNutritionData((current) => ({ ...current, [goal]: value }));
@@ -1085,6 +1094,28 @@ export default function App() {
             </section>
           </section>
         ) : activeNav === 'Nutrición' ? (
+          <NutritionModule
+            scopeId={profileScopeId}
+            profile={{
+              name: activeProfile?.name ?? '',
+              sex: activeProfile?.sex ?? '',
+              age: activeProfile && Number(activeProfile.age) > 0 ? Number(activeProfile.age) : null,
+              weightKg: activeProfile && Number(activeProfile.weight) > 0 ? Number(activeProfile.weight) : null,
+              heightCm: activeProfile && Number(activeProfile.height) > 0 ? Number(activeProfile.height) : null,
+              goalText: activeProfile?.goal ?? '',
+              activityLevel: activeProfile?.activityLevel ?? '',
+            }}
+            entriesByDay={nutritionData.entriesByDay}
+            waterGoalMl={nutritionData.waterGoalMl}
+            proteinGoalGrams={nutritionData.proteinGoalGrams}
+            onAddEntries={addNutritionEntries}
+            onRemoveEntry={removeNutritionEntry}
+            onProteinGoal={(grams) => updateNutritionGoal('proteinGoalGrams', grams)}
+            plan={activeTrainingPlan}
+            metrics={exerciseMetrics}
+            bodyWeight={progressHistory.bodyWeight}
+            exerciseLoads={progressHistory.exerciseLoads}
+            legacy={
           <section className="nutrition-screen">
             <header className="topbar">
               <div>
@@ -1211,6 +1242,8 @@ export default function App() {
               )}
             </section>
           </section>
+            }
+          />
         ) : activeNav === 'Usuarios' ? (
           <section className="users-screen">
             <header className="topbar">

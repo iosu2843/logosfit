@@ -12,6 +12,7 @@ const syncedKeys = [
   'fitness-completed-exercises-by-profile',
   'fitness-progress-history-by-profile',
   'fitness-nutrition-by-profile',
+  'fitness-nutrition-ai-by-profile',
   'fitness-training-plans-by-profile',
 ] as const;
 

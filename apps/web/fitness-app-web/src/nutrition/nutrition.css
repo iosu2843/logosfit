@@ -1,0 +1,103 @@
+.nutrition-ai { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.nai-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.nai-tabs button { flex: 0 0 auto; background: var(--surface, #161616); color: #cfcfcf; border: 1px solid var(--border, #2a2a2a); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 0.88rem; cursor: pointer; white-space: nowrap; }
+.nai-tabs button.active { background: var(--accent, #ff7a00); color: #111; border-color: var(--accent, #ff7a00); font-weight: 700; }
+.nai-panel { min-width: 0; }
+.nai-stack { display: flex; flex-direction: column; gap: 14px; }
+.nai-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.nai-span { grid-column: 1 / -1; }
+.nai-card { background: var(--surface, #161616); border: 1px solid var(--border, #2a2a2a); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.nai-card h3 { margin: 0; font-size: 1rem; }
+.nai-card h4 { margin: 6px 0 0; font-size: 0.9rem; color: var(--accent, #ff7a00); }
+.nai-card p { margin: 0; }
+.nai-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.nai-muted { color: #9a9a9a; font-size: 0.85rem; }
+.nai-empty { color: #9a9a9a; font-size: 0.9rem; margin: 0; }
+.nai-error { color: #ff7b7b; font-size: 0.88rem; }
+.nai-over dd { color: #ff7b7b; }
+.nai-chip { display: inline-block; border: 1px solid var(--accent, #ff7a00); color: var(--accent, #ff7a00); border-radius: 999px; padding: 3px 10px; font-size: 0.78rem; }
+.nai-chip-btn { background: transparent; font: inherit; font-size: 0.82rem; cursor: pointer; }
+.nai-chip-btn.active { background: var(--accent, #ff7a00); color: #111; font-weight: 700; }
+.nai-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nai-btn { display: inline-flex; align-items: center; justify-content: center; background: #222; color: #f2f2f2; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; padding: 9px 14px; font: inherit; font-size: 0.88rem; cursor: pointer; }
+.nai-btn:hover:not(:disabled) { border-color: var(--accent, #ff7a00); }
+.nai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.nai-primary { background: var(--accent, #ff7a00); color: #111; border-color: var(--accent, #ff7a00); font-weight: 700; }
+.nai-link { background: none; border: none; color: var(--accent, #ff7a00); cursor: pointer; font: inherit; font-size: 0.85rem; padding: 2px 0; text-align: left; }
+.nai-icon-btn { background: transparent; border: 1px solid var(--border, #2a2a2a); color: #cfcfcf; border-radius: 8px; min-width: 32px; height: 32px; cursor: pointer; font: inherit; }
+.nai-icon-btn:hover { border-color: var(--accent, #ff7a00); color: var(--accent, #ff7a00); }
+.nai-input { background: #0f0f0f; color: #f2f2f2; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; padding: 9px 10px; font: inherit; font-size: 0.9rem; min-width: 0; width: 100%; box-sizing: border-box; }
+.nai-input:focus { outline: 2px solid var(--accent, #ff7a00); outline-offset: 1px; }
+.nai-input[readonly] { color: #9a9a9a; }
+.nai-small { width: 76px; }
+.nai-row, .nai-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.nai-row > .nai-input { flex: 1 1 140px; width: auto; }
+.nai-inline { display: inline-flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #cfcfcf; }
+.nai-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.nai-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: #b5b5b5; }
+.nai-wide { grid-column: 1 / -1; }
+.nai-check { flex-direction: row !important; align-items: center; gap: 8px !important; }
+.nai-add { display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed var(--border, #2a2a2a); padding-top: 10px; }
+.nai-details summary { cursor: pointer; color: var(--accent, #ff7a00); font-size: 0.88rem; }
+.nai-details ul { margin: 6px 0 0 18px; padding: 0; color: #cfcfcf; font-size: 0.88rem; }
+.nai-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.nai-list li { display: flex; align-items: center; gap: 8px; justify-content: space-between; background: #111; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; padding: 8px 10px; }
+.nai-list li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.nai-list small { color: #9a9a9a; font-size: 0.78rem; }
+.nai-results li { padding: 0; border: none; background: none; }
+.nai-result { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; background: #111; color: inherit; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; padding: 8px 10px; font: inherit; cursor: pointer; }
+.nai-result:hover { border-color: var(--accent, #ff7a00); }
+.nai-notice { background: rgba(255, 122, 0, 0.1); border: 1px solid var(--accent, #ff7a00); border-radius: 12px; padding: 10px 12px; font-size: 0.88rem; }
+.nai-disclaimer { color: #8a8a8a; font-size: 0.78rem; margin: 0; }
+.nai-steps { margin: 0; padding-left: 20px; color: #cfcfcf; font-size: 0.9rem; display: flex; flex-direction: column; gap: 4px; }
+.nai-steps code { color: var(--accent, #ff7a00); }
+.nai-preview { max-width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border, #2a2a2a); }
+.nai-scan-list li { flex-direction: column; align-items: stretch; }
+.nai-scan-main { display: flex; gap: 8px; align-items: center; }
+.nai-totals { background: #111; border: 1px solid var(--accent, #ff7a00); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.nai-totals h4 { margin: 0 0 4px; }
+.nai-plan-meal { display: flex; flex-direction: column; gap: 6px; }
+
+.nai-kcal { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.nai-kcal-list { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.nai-kcal-list div { display: flex; flex-direction: column; }
+.nai-kcal-list dt, .nai-facts dt { color: #9a9a9a; font-size: 0.78rem; }
+.nai-kcal-list dd, .nai-facts dd { margin: 0; font-weight: 700; }
+.nai-facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.nai-facts div { background: #111; border: 1px solid var(--border, #2a2a2a); border-radius: 10px; padding: 10px; }
+.nai-rings { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 10px; }
+.nai-ring { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.nai-ring figcaption { font-size: 0.8rem; color: #cfcfcf; }
+.nai-ring-track { fill: none; stroke: #262626; stroke-width: 9; }
+.nai-ring-fill { fill: none; stroke-width: 9; stroke-linecap: round; transition: stroke-dasharray 0.4s; }
+.nai-ring-value { fill: #f2f2f2; font-size: 20px; font-weight: 700; }
+.nai-ring-sub { fill: #9a9a9a; font-size: 9px; }
+.nai-bar { display: flex; flex-direction: column; gap: 6px; }
+.nai-bar-head { display: flex; justify-content: space-between; font-size: 0.88rem; }
+.nai-bar-head small { color: #9a9a9a; font-weight: 400; }
+.nai-bar-track { height: 10px; background: #262626; border-radius: 999px; overflow: hidden; }
+.nai-bar-track span { display: block; height: 100%; border-radius: 999px; transition: width 0.4s; }
+.nai-meal-dist { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.nai-meal-col { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.78rem; text-align: center; }
+.nai-meal-col small { color: #9a9a9a; }
+.nai-meal-bar { width: 100%; max-width: 44px; height: 90px; background: #262626; border-radius: 8px; display: flex; align-items: flex-end; overflow: hidden; }
+.nai-meal-bar span { width: 100%; background: var(--accent, #ff7a00); }
+
+.nai-chart svg { width: 100%; height: auto; display: block; }
+.nai-grid { stroke: #2a2a2a; stroke-width: 1; }
+.nai-reference { stroke: var(--accent, #ff7a00); stroke-dasharray: 5 4; stroke-width: 1.5; }
+.nai-axis { fill: #8a8a8a; font-size: 10px; }
+.nai-chart circle, .nai-chart rect { cursor: pointer; outline: none; }
+.nai-chart circle:focus-visible, .nai-chart rect:focus-visible { stroke: #fff; stroke-width: 2; }
+.nai-chart-readout { min-height: 22px; display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.85rem; align-items: center; }
+.nai-chart-readout i, .nai-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+.nai-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; color: #cfcfcf; }
+.nai-rec-warning { border-color: #b3541e; }
+.nai-rec-adjustment { border-color: var(--accent, #ff7a00); }
+.nai-proposal { background: #111; border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+@media (max-width: 720px) {
+  .nai-grid-2 { grid-template-columns: 1fr; }
+  .nai-meal-dist { gap: 4px; }
+  .nai-card { padding: 12px; }
+}
