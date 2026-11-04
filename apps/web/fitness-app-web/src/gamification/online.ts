@@ -41,8 +41,8 @@ export async function submitScore(payload: ScorePayload): Promise<SubmitResult> 
 }
 
 export async function fetchLeaderboard(metric: string, scope: OnlineScope): Promise<OnlineRow[]> {
-  const rows = await rpc<Array<{ user_id: string; display_name: string; country: string | null; score: number; position: number; is_self: boolean }>>('get_leaderboard', { p_metric: metric, p_scope: scope, p_limit: 50 });
-  return (rows ?? []).map((row) => ({ userId: row.user_id, name: row.display_name, country: row.country, score: row.score, position: Number(row.position), self: row.is_self }));
+  const rows = await rpc<Array<{ user_id: string; display_name: string; country: string | null; score: number; rank_pos: number; is_self: boolean }>>('get_leaderboard', { p_metric: metric, p_scope: scope, p_limit: 50 });
+  return (rows ?? []).map((row) => ({ userId: row.user_id, name: row.display_name, country: row.country, score: row.score, position: Number(row.rank_pos), self: row.is_self }));
 }
 
 export async function sendFriendRequest(code: string): Promise<'pending' | 'accepted' | 'not_found'> {

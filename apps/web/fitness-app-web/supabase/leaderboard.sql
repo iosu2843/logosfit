@@ -124,7 +124,7 @@ end $$;
 
 -- scope: global | friends | country. metric: logos o nombre de músculo.
 create or replace function public.get_leaderboard(p_metric text, p_scope text, p_limit integer default 50)
-returns table (user_id uuid, display_name text, country text, score integer, position bigint, is_self boolean)
+returns table (user_id uuid, display_name text, country text, score integer, rank_pos bigint, is_self boolean)
 language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid();
