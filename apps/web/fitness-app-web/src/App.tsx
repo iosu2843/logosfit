@@ -11,6 +11,7 @@ import { removeItem, saveItem } from './cloud';
 import NutritionModule from './nutrition/NutritionModule';
 import type { NutritionEntry, NutritionProfileData } from './nutrition/types';
 import { readAIData } from './nutrition/store';
+import HomeRanking from './gamification/HomeRanking';
 import GamificationModule, { UnlockToasts, playUnlockSound } from './gamification/GamificationModule';
 import { buildReport, type RankEntry } from './gamification/engine';
 import { readGamState, useGamState, withDate } from './gamification/store';
@@ -1842,48 +1843,7 @@ export default function App() {
             </section>
 
             <section className="content-grid">
-              <div className="card daily-plan-card" style={{ background: theme.card }}>
-                <div className="section-header">
-                  <div>
-                    <p className="eyebrow muted">
-                      {new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(selectedDate)}
-                    </p>
-                    <h3>Plan diario</h3>
-                  </div>
-                  <div className="daily-plan-heading-actions">
-                    <span>{selectedDay ? `${selectedDay.type} · ${selectedDay.exercises.length} ejercicios` : 'Descanso'}</span>
-                    <button className="daily-plan-link" type="button" onClick={() => setActiveNav('Calendario')}>
-                      Ver calendario
-                    </button>
-                  </div>
-                </div>
-
-                {selectedDay ? (
-                  <div className="daily-plan-list">
-                    {selectedDay.exercises.map((exercise) => {
-                      const metrics = getMetrics(exerciseMetrics, exercise);
-                      return (
-                        <article className="daily-plan-exercise" key={exercise.name}>
-                          <MuscleDiagram exercise={exercise} size="sm" />
-                          <div className="daily-plan-exercise-info">
-                            <span className="exercise-group">{exercise.group}</span>
-                            <strong>{exercise.name}</strong>
-                            <small>{exercise.kind === 'cardio' ? `Nivel ${metrics.level}/10 · ${metrics.duration} min` : `${metrics.sets} series · ${metrics.reps} reps · ${metrics.weight} kg`}</small>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="daily-plan-rest">
-                    <span className="rest-symbol">↗</span>
-                    <div>
-                      <strong>Día de recuperación</strong>
-                      <p>Hoy no hay ejercicios programados en el calendario.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <HomeRanking report={gamReport} state={gamState} name={activeProfile?.name ?? 'Perfil local'} onOpen={() => setActiveNav('Logros')} />
 
               <div className="card side-card home-nutrition-card" style={{ background: theme.card }}>
                 <div className="section-header">
