@@ -1,12 +1,38 @@
 import { useCallback, useState } from 'react';
 import { saveItem } from '../cloud';
 import { defaultMealSplit } from './calc';
-import type { Macros, MealType, NutritionAIData, NutritionEntry, PlanDay, PlannedItem } from './types';
+import { defaultPrefs } from './nutritionGoalsEngine';
+import type { GoalMode, GoalsState, Macros, MealType, NutritionAIData, NutritionEntry, PlanDay, PlannedItem } from './types';
 import { mealTypes } from './types';
 
 export const NUTRITION_AI_KEY = 'fitness-nutrition-ai-by-profile';
 
 export const emptyPlanDay = (): PlanDay => Object.fromEntries(mealTypes.map((meal) => [meal.id, [] as PlannedItem[]])) as PlanDay;
+
+export const defaultGoalsState = (): GoalsState => ({ mode: null, prefs: defaultPrefs(), weekStart: null, weekly: [], reviews: [] });
+
+const goalModeIds: GoalMode[] = ['volume', 'cut', 'recomp', 'maintain', 'habits'];
+
+export function normalizeGoalsState(raw: unknown): GoalsState {
+  const base = defaultGoalsState();
+  if (!isRecord(raw)) return base;
+  const prefs = isRecord(raw.prefs) ? raw.prefs : {};
+  const flags = isRecord(prefs.flags) ? prefs.flags : {};
+  const text = (value: unknown) => (typeof value === 'string' ? value.slice(0, 300) : '');
+  return {
+    mode: goalModeIds.includes(raw.mode as GoalMode) ? (raw.mode as GoalMode) : null,
+    prefs: {
+      experience: text(prefs.experience),
+      restrictions: text(prefs.restrictions),
+      allergies: text(prefs.allergies),
+      mealTimes: text(prefs.mealTimes),
+      flags: { eatingDisorder: flags.eatingDisorder === true, pregnancy: flags.pregnancy === true, condition: flags.condition === true, medication: flags.medication === true },
+    },
+    weekStart: typeof raw.weekStart === 'string' ? raw.weekStart : null,
+    weekly: Array.isArray(raw.weekly) ? (raw.weekly as GoalsState['weekly']).filter((goal) => isRecord(goal) && typeof goal.id === 'string' && Number.isFinite(goal.target)) : [],
+    reviews: Array.isArray(raw.reviews) ? (raw.reviews as GoalsState['reviews']) : [],
+  };
+}
 
 export const defaultAIData = (): NutritionAIData => ({
   version: 1,
@@ -21,6 +47,7 @@ export const defaultAIData = (): NutritionAIData => ({
   weekPlan: {},
   adjustments: [],
   dismissed: {},
+  goals: defaultGoalsState(),
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -46,6 +73,7 @@ export function normalizeAIData(raw: unknown): NutritionAIData {
     weekPlan: isRecord(raw.weekPlan) ? (raw.weekPlan as unknown as NutritionAIData['weekPlan']) : {},
     adjustments: list(raw.adjustments),
     dismissed: isRecord(raw.dismissed) ? (raw.dismissed as Record<string, string>) : {},
+    goals: normalizeGoalsState(raw.goals),
   };
 }
 

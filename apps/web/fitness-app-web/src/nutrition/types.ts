@@ -69,6 +69,39 @@ export type PlanDay = Record<MealType, PlannedItem[]>;
 
 export type AdjustmentRecord = { date: string; summary: string; from: Targets; to: Targets };
 
+/** Modos de objetivo de Nutrition Goals AI. Cada uno se asocia a un NutritionGoal para el resto del módulo. */
+export type GoalMode = 'volume' | 'cut' | 'recomp' | 'maintain' | 'habits';
+export type SafetyFlags = { eatingDisorder: boolean; pregnancy: boolean; condition: boolean; medication: boolean };
+export type GoalPrefs = {
+  experience: string;
+  restrictions: string;
+  allergies: string;
+  mealTimes: string;
+  flags: SafetyFlags;
+};
+export type WeeklyGoalStatus = 'pending' | 'progress' | 'done';
+export type WeeklyGoal = {
+  id: string;
+  name: string;
+  description: string;
+  reason: string;
+  /** Meta numérica (días, sesiones…). */
+  target: number;
+  /** Clave de la métrica calculada automáticamente; sin ella el usuario marca el avance a mano. */
+  metric?: 'logged' | 'protein' | 'calories' | 'water' | 'fiber' | 'training';
+  manualProgress: number;
+  /** Marcado manual como completada (solo metas sin métrica automática). */
+  manualDone: boolean;
+};
+export type GoalReviewRecord = { date: string; title: string; action: 'keep' | 'apply' | 'dismiss'; from?: Targets; to?: Targets };
+export type GoalsState = {
+  mode: GoalMode | null;
+  prefs: GoalPrefs;
+  weekStart: string | null;
+  weekly: WeeklyGoal[];
+  reviews: GoalReviewRecord[];
+};
+
 export type NutritionAIData = {
   version: 1;
   goal: NutritionGoal | null;
@@ -82,6 +115,7 @@ export type NutritionAIData = {
   weekPlan: Record<number, PlanDay>;
   adjustments: AdjustmentRecord[];
   dismissed: Record<string, string>;
+  goals: GoalsState;
 };
 
 export type ProgressPoint = { id: string; date: string; value: number };

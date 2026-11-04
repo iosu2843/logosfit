@@ -9,6 +9,7 @@ export type NutritionProfileInfo = {
   heightCm: number | null;
   goalText: string;
   activityLevel: string;
+  experience: string;
 };
 
 export type NutritionCtx = {
@@ -30,4 +31,7 @@ export type NutritionCtx = {
   metrics: MetricsLike;
   bodyWeight: ProgressPoint[];
   exerciseLoads: Record<string, ProgressPoint[]>;
+  /** Fechas (YYYY-MM-DD) con sesión de entrenamiento completada. */
+  trainedDates: string[];
+  setWaterGoal: (ml: number) => void;
 };

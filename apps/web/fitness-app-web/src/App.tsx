@@ -1354,6 +1354,7 @@ export default function App() {
               heightCm: activeProfile && Number(activeProfile.height) > 0 ? Number(activeProfile.height) : null,
               goalText: activeProfile?.goal ?? '',
               activityLevel: activeProfile?.activityLevel ?? '',
+              experience: activeProfile?.experience ?? '',
             }}
             entriesByDay={nutritionData.entriesByDay}
             waterGoalMl={nutritionData.waterGoalMl}
@@ -1365,6 +1366,8 @@ export default function App() {
             metrics={exerciseMetrics}
             bodyWeight={progressHistory.bodyWeight}
             exerciseLoads={progressHistory.exerciseLoads}
+            trainedDates={Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).map(([date]) => date)}
+            onWaterGoal={(ml) => updateNutritionGoal('waterGoalMl', ml)}
             legacy={
           <section className="nutrition-screen">
             <header className="topbar">

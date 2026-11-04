@@ -3,6 +3,7 @@ import './nutrition.css';
 import Dashboard from './Dashboard';
 import Evolution from './Evolution';
 import FoodLog from './FoodLog';
+import Goals from './Goals';
 import Insights from './Insights';
 import Planner from './Planner';
 import type { NutritionCtx, NutritionProfileInfo } from './ctx';
@@ -12,10 +13,11 @@ import { useNutritionAI } from './store';
 import type { MetricsLike, TrainingDayLike } from './training';
 import type { NutritionEntry, ProgressPoint, Targets } from './types';
 
-type TabId = 'summary' | 'diary' | 'planner' | 'insights' | 'evolution' | 'quick';
+type TabId = 'summary' | 'goals' | 'diary' | 'planner' | 'insights' | 'evolution' | 'quick';
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'summary', label: 'Resumen' },
+  { id: 'goals', label: 'Metas' },
   { id: 'diary', label: 'Diario' },
   { id: 'planner', label: 'Planificador' },
   { id: 'insights', label: 'Recomendaciones' },
@@ -36,6 +38,8 @@ export type NutritionModuleProps = {
   metrics: MetricsLike;
   bodyWeight: ProgressPoint[];
   exerciseLoads: Record<string, ProgressPoint[]>;
+  trainedDates: string[];
+  onWaterGoal: (ml: number) => void;
   /** Pantalla de registro rápido original, conservada sin cambios. */
   legacy: ReactNode;
 };
@@ -69,6 +73,8 @@ export default function NutritionModule(props: NutritionModuleProps) {
     metrics: props.metrics,
     bodyWeight: props.bodyWeight,
     exerciseLoads: props.exerciseLoads,
+    trainedDates: props.trainedDates,
+    setWaterGoal: props.onWaterGoal,
   };
 
   const goTo = (id: string) => setTab(id as TabId);
@@ -88,6 +94,7 @@ export default function NutritionModule(props: NutritionModuleProps) {
       </nav>
       <div className="nai-panel" role="tabpanel">
         {tab === 'summary' && <Dashboard ctx={ctx} goTo={goTo} />}
+        {tab === 'goals' && <Goals ctx={ctx} />}
         {tab === 'diary' && <FoodLog ctx={ctx} />}
         {tab === 'planner' && <Planner ctx={ctx} />}
         {tab === 'insights' && <Insights ctx={ctx} />}
