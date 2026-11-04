@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { adjustWeight, routines } from '@core';
 import { createRestTimer, formatRestTime, pauseRestTimer, resetRestTimer, startRestTimer, tickRestTimer, type RestTimerState } from '@core';
 import { theme } from '@ui/theme';
@@ -10,6 +10,11 @@ import { bestOneRepMax, countCompletedExercises, currentStreak, dayHasRecord, is
 import { removeItem, saveItem } from './cloud';
 import NutritionModule from './nutrition/NutritionModule';
 import type { NutritionEntry, NutritionProfileData } from './nutrition/types';
+import { readAIData } from './nutrition/store';
+import GamificationModule, { UnlockToasts, playUnlockSound } from './gamification/GamificationModule';
+import { buildReport, type RankEntry } from './gamification/engine';
+import { readGamState, useGamState, withDate } from './gamification/store';
+import type { GamCtx } from './gamification/types';
 
 const nextWeight = adjustWeight({
   lastWeight: 40,
@@ -23,7 +28,7 @@ const defaultStats = [
   { label: 'Objetivo', value: '86%', unit: 'cumplido' },
 ];
 
-const navItems = ['Usuarios', 'Home', 'Calendario', 'Ejercicios', 'Progreso', 'Nutrición'];
+const navItems = ['Usuarios', 'Home', 'Calendario', 'Ejercicios', 'Progreso', 'Nutrición', 'Logros'];
 const navLabels: Record<string, string> = { Home: 'Inicio' };
 const navIcons: Record<string, string> = {
   Usuarios: 'nav-users',
@@ -32,6 +37,7 @@ const navIcons: Record<string, string> = {
   Ejercicios: 'nav-exercises',
   Progreso: 'nav-progress',
   Nutrición: 'nav-nutrition',
+  Logros: 'nav-trophy',
 };
 
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
@@ -435,6 +441,71 @@ export default function App() {
       ]
     : defaultStats;
 
+  const gamToday = localDateKey(todayDate);
+  const [gamState, updateGam] = useGamState(profileScopeId);
+  const [toastIds, setToastIds] = useState<string[]>([]);
+  const gamCtxFor = (id: string, profile: FitnessProfile | null, state = readGamState(id)): GamCtx => {
+    const history = progressHistoryByProfile[id] ?? { bodyWeight: [], exerciseLoads: {} };
+    const nutrition = nutritionByProfile[id] ?? defaultNutritionData(profile);
+    return {
+      today: gamToday,
+      workoutLog: workoutLogByProfile[id] ?? {},
+      plan: trainingPlansByProfile[id] ?? trainingDays,
+      bodyWeight: history.bodyWeight.map((point) => ({ date: point.date, value: point.value })),
+      entriesByDay: nutrition.entriesByDay,
+      nutrition: { recipes: readAIData(id).recipes.length, proteinGoal: nutrition.proteinGoalGrams, calorieTarget: null },
+      profile: {
+        name: profile?.name ?? '',
+        complete: Boolean(profile && profile.name && profile.age && profile.sex && profile.weight && profile.height && profile.goal),
+        weightKg: profile && Number(profile.weight) > 0 ? Number(profile.weight) : null,
+      },
+      state,
+    };
+  };
+  const gamReport = useMemo(
+    () => buildReport(gamCtxFor(profileScopeId, activeProfile, gamState)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profileScopeId, activeProfile, gamState, workoutLogByProfile, trainingPlansByProfile, progressHistoryByProfile, nutritionByProfile, gamToday, activeNav],
+  );
+  const gamRanking = useMemo<RankEntry[]>(() => {
+    if (activeNav !== 'Logros') return [];
+    return profiles.map((profile) => {
+      const isSelf = profile.id === profileScopeId;
+      const state = isSelf ? gamState : readGamState(profile.id);
+      const report = isSelf ? gamReport : buildReport(gamCtxFor(profile.id, profile, state));
+      return {
+        id: profile.id,
+        name: profile.name || 'Sin nombre',
+        visibility: state.visibility,
+        hideRankings: state.hideRankings,
+        logos: report.logos.total,
+        muscles: Object.fromEntries(report.muscles.map((m) => [m.muscle, m.score])),
+        self: isSelf,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNav, profiles, profileScopeId, gamState, gamReport]);
+
+  useEffect(() => {
+    updateGam((current) => withDate(current, 'visits', gamToday));
+  }, [gamToday, updateGam]);
+
+  useEffect(() => {
+    if (activeNav === 'Progreso') updateGam((current) => withDate(current, 'charts', gamToday));
+    if (activeNav === 'Logros') updateGam((current) => withDate(current, 'reportViews', gamToday));
+  }, [activeNav, gamToday, updateGam]);
+
+  useEffect(() => {
+    const fresh = gamReport.newlyUnlocked;
+    if (!gamState.initialized) {
+      updateGam((current) => ({ ...current, initialized: true, seen: [...current.seen, ...fresh.map((item) => item.def.id)], firstSeen: { ...current.firstSeen, ...Object.fromEntries(fresh.filter((item) => item.def.undated).map((item) => [item.def.id, gamToday])) } }));
+      return;
+    }
+    if (fresh.length === 0) return;
+    setToastIds((current) => [...current, ...fresh.map((item) => item.def.id)]);
+    if (gamState.sound) playUnlockSound();
+    updateGam((current) => ({ ...current, seen: [...current.seen, ...fresh.map((item) => item.def.id)], firstSeen: { ...current.firstSeen, ...Object.fromEntries(fresh.filter((item) => item.def.undated).map((item) => [item.def.id, gamToday])) } }));
+  }, [gamReport, gamState.initialized, gamState.sound, gamToday, updateGam]);
   useEffect(() => {
     const refreshToday = () => {
       const now = new Date();
@@ -716,7 +787,7 @@ export default function App() {
     }
   };
 
-  const currentTitle = activeNav === 'Progreso' ? 'Progreso' : activeNav === 'Nutrición' ? 'Nutrición' : 'Inicio';
+  const currentTitle = activeNav === 'Progreso' ? 'Progreso' : activeNav === 'Nutrición' ? 'Nutrición' : activeNav === 'Logros' ? 'Logros' : 'Inicio';
   const weekStart = startOfWeek(calendarDate);
   const visibleWeek = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
   const monthStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
@@ -809,6 +880,7 @@ export default function App() {
     const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
     setTrainingPlansByProfile(nextByProfile);
     saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+    updateGam((current) => withDate(current, 'routineEdits', gamToday));
   };
 
   const changeDayType = (type: string) => {
@@ -827,6 +899,7 @@ export default function App() {
     const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
     setTrainingPlansByProfile(nextByProfile);
     saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+    updateGam((current) => withDate(current, 'routineEdits', gamToday));
     setEditorDayIndex(targetDayIndex);
   };
 
@@ -1001,6 +1074,10 @@ export default function App() {
         </div>
       </aside>
 
+      <UnlockToasts
+        items={gamReport.achievements.filter((item) => toastIds.includes(item.def.id))}
+        onDismiss={(id) => setToastIds((current) => current.filter((x) => x !== id))}
+      />
       <main className="main-panel">
         {screen === 'session' ? (
           <section className="session-screen">
@@ -1308,6 +1385,15 @@ export default function App() {
             exerciseLoads={progressHistory.exerciseLoads}
             trainedDates={Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).map(([date]) => date)}
             onWaterGoal={(ml) => updateNutritionGoal('waterGoalMl', ml)}
+          />
+        ) : activeNav === 'Logros' ? (
+          <GamificationModule
+            report={gamReport}
+            state={gamState}
+            today={gamToday}
+            ranking={gamRanking}
+            exerciseNames={[...new Set(Object.values(activeTrainingPlan).flatMap((day) => day?.exercises.map((exercise) => exercise.name) ?? []))]}
+            onState={updateGam}
           />
         ) : activeNav === 'Usuarios' ? (
           <section className="users-screen">

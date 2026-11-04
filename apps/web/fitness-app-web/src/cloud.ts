@@ -15,6 +15,7 @@ const syncedKeys = [
   'fitness-nutrition-by-profile',
   'fitness-nutrition-ai-by-profile',
   'fitness-training-plans-by-profile',
+  'fitness-gamification-by-profile',
 ] as const;
 
 const updatedAtKey = 'fitness-updated-at';

@@ -1,4 +1,4 @@
-export type SetLog = { weight: number; reps: number };
+export type SetLog = { weight: number; reps: number; warmup?: boolean };
 export type WorkoutExerciseLog = {
   sets: number;
   target: number;
@@ -242,3 +242,4 @@ export function shiftWeeks(date: Date, weeks: number): Date {
 }
 
 export { parseKey };
+
