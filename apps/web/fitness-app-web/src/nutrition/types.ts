@@ -50,7 +50,9 @@ export type FoodItem = {
   unit: 'g' | 'ml';
   /** Valores por 100 g (o 100 ml). */
   per100: Macros;
-  source: 'USDA' | 'usuario';
+  source: 'USDA' | 'referencia' | 'usuario';
+  /** Categoría del catálogo (p. ej. "Quesos"). */
+  category?: string;
 };
 
 export type NutritionGoal = 'gain' | 'maintain' | 'lose';

@@ -150,7 +150,7 @@ export default function FoodLog({ ctx }: { ctx: NutritionCtx }) {
                         <li key={food.id}>
                           <button type="button" className="nai-result" onClick={() => { setPicked(food); setAmount('100'); }}>
                             <strong>{food.name}</strong>
-                            <small>{food.per100.calories} kcal · P {food.per100.protein} · C {food.per100.carbohydrates} · G {food.per100.fat} por 100 {food.unit} · {food.source}</small>
+                            <small>{food.per100.calories} kcal · P {food.per100.protein} · C {food.per100.carbohydrates} · G {food.per100.fat} por 100 {food.unit} · {food.category ?? food.source}{food.source === 'referencia' ? ' (aprox.)' : ''}</small>
                           </button>
                           <button type="button" className="nai-icon-btn" aria-label={`Favorito ${food.name}`} onClick={() => toggleFavorite(food.id)}>{ai.favoriteFoodIds.includes(food.id) ? '★' : '☆'}</button>
                         </li>

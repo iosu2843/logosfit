@@ -1,3 +1,7 @@
+import { dairy } from './catalog/dairy';
+import { extras } from './catalog/extras';
+import { plants } from './catalog/plants';
+import { protein } from './catalog/protein';
 import type { FoodItem } from './types';
 
 type Seed = [name: string, calories: number, protein: number, carbohydrates: number, fat: number, fiber?: number, unit?: 'g' | 'ml'];
@@ -48,13 +52,28 @@ const seeds: Seed[] = [
   ['Miel', 304, 0.3, 82.4, 0, 0.2],
 ];
 
-export const referenceFoods: FoodItem[] = seeds.map(([name, calories, protein, carbohydrates, fat, fiber, unit]) => ({
+const baseFoods: FoodItem[] = seeds.map(([name, calories, proteinG, carbohydrates, fat, fiber, unit]) => ({
   id: `usda-${slug(name)}`,
   name,
   unit: unit ?? 'g',
-  per100: { calories, protein, carbohydrates, fat, fiber },
+  per100: { calories, protein: proteinG, carbohydrates, fat, fiber },
   source: 'USDA',
 }));
+
+const known = new Set(baseFoods.map((food) => normalizeText(food.name)));
+
+/** Catálogo ampliado: valores aproximados de referencia (BEDCA/USDA). Se omiten nombres ya incluidos en la base inicial. */
+const catalogFoods: FoodItem[] = [...dairy, ...protein, ...plants, ...extras].flatMap((section) =>
+  section.rows.flatMap(([name, calories, proteinG, carbohydrates, fat, fiber, unit]) => {
+    const key = normalizeText(name);
+    if (known.has(key)) return [];
+    known.add(key);
+    const food: FoodItem = { id: `ref-${slug(name)}`, name, unit: unit ?? 'g', per100: { calories, protein: proteinG, carbohydrates, fat, fiber }, source: 'referencia', category: section.category };
+    return [food];
+  }),
+);
+
+export const referenceFoods: FoodItem[] = [...baseFoods, ...catalogFoods];
 
 export function searchFoods(foods: FoodItem[], query: string, limit = 8): FoodItem[] {
   const needle = normalizeText(query);
@@ -63,7 +82,8 @@ export function searchFoods(foods: FoodItem[], query: string, limit = 8): FoodIt
   return foods
     .map((food) => {
       const haystack = normalizeText(food.name);
-      if (!words.every((word) => haystack.includes(word))) return null;
+      const searchable = food.category ? `${haystack} ${normalizeText(food.category)}` : haystack;
+      if (!words.every((word) => searchable.includes(word))) return null;
       return { food, rank: haystack.startsWith(needle) ? 0 : haystack.includes(needle) ? 1 : 2 };
     })
     .filter((item): item is { food: FoodItem; rank: number } => item !== null)
