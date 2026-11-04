@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { buildLeaderboard, type GamReport, type RankEntry } from './engine';
-import { categoryInfo, leagueMuscles, tierLabels, type AchievementState, type Category, type CustomMilestone, type GamState, type LeagueMuscle, type Tier, type Visibility } from './types';
+import { categoryInfo, leagueMuscles, tierLabels, type AchievementState, type Category, type CustomMilestone, type GamState, type LeagueMuscle, type Tier } from './types';
 import { divisions } from './leagues';
 import { cumXP } from './xp';
 import { ironMilestones } from './milestones';
@@ -172,7 +172,7 @@ function OnlineRanking({ report, state, selfName, metric, onState }: { report: G
       muscles: Object.fromEntries(report.muscles.map((m) => [m.muscle, m.score])),
     });
     if (result.friendCode) setMyCode(result.friendCode);
-    setMessage(result.message + (state.visibility === 'private' ? ' Tu visibilidad es «Privado»: no aparecerás en listas ajenas (cámbiala en Vitrina).' : ''));
+    setMessage(result.message + (state.visibility === 'private' ? ' Tu visibilidad es «Privado»: no aparecerás en listas ajenas (cámbiala en Usuarios).' : ''));
     if (result.status === 'ok' || result.status === 'capped') setRows(await fetchLeaderboard(metric, scope));
   });
 
@@ -303,18 +303,6 @@ function Showcase({ report, state, exerciseNames, onState }: Pick<Props, 'report
       <article className="gm-card gm-detail">
         <h3>Vitrina de trofeos</h3>
         {pinned.length === 0 ? <p className="gm-note">Fija hasta 6 logros desde el Salón con «A la vitrina».</p> : <div className="gm-grid">{pinned.map((item) => <AchievementCard key={item.def.id} item={item} />)}</div>}
-      </article>
-      <article className="gm-card gm-detail">
-        <h3>Privacidad y preferencias</h3>
-        <label className="gm-field">Visibilidad del perfil
-          <select value={state.visibility} onChange={(e) => onState((c) => ({ ...c, visibility: e.target.value as Visibility }))}>
-            <option value="private">Privado (por defecto)</option>
-            <option value="friends">Solo amigos</option>
-            <option value="public">Público</option>
-          </select>
-        </label>
-        <label className="gm-check"><input type="checkbox" checked={state.hideRankings} onChange={(e) => onState((c) => ({ ...c, hideRankings: e.target.checked }))} /> Ocultarme de las clasificaciones</label>
-        <label className="gm-check"><input type="checkbox" checked={state.sound} onChange={(e) => onState((c) => ({ ...c, sound: e.target.checked }))} /> Sonido al desbloquear logros</label>
       </article>
       <article className="gm-card gm-detail">
         <h3>Hitos personalizados</h3>

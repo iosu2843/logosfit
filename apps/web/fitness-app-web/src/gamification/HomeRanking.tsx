@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchLeaderboard, submitScore, type OnlineRow, type OnlineScope } from './online';
 import type { GamReport } from './engine';
+import { divisionFor, nextDivision } from './leagues';
 import type { GamState } from './types';
 
 type Props = { report: GamReport; state: GamState; name: string; onOpen: () => void };
@@ -14,6 +15,8 @@ export default function HomeRanking({ report, state, name, onOpen }: Props) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const logos = report.logos.total;
+  const division = divisionFor(logos);
+  const next = nextDivision(logos);
   const visible = state.visibility !== 'private';
 
   useEffect(() => {
@@ -55,6 +58,11 @@ export default function HomeRanking({ report, state, name, onOpen }: Props) {
         </div>
         <button className="daily-plan-link" type="button" onClick={onOpen}>Ver completa</button>
       </div>
+      <div className="home-ranking-league">
+        <strong>Liga {division.name}</strong>
+        <span>Nivel {report.level.level} · {report.level.title}</span>
+        <small>{logos} pts{next ? ` · ${next.missing} para ${next.division.name}` : ' · liga máxima'}</small>
+      </div>
       <div className="gm-tabs">
         {scopes.map(([id, label]) => (
           <button key={id} type="button" className={scope === id ? 'on' : ''} onClick={() => setScope(id)}>{label}</button>
@@ -63,7 +71,7 @@ export default function HomeRanking({ report, state, name, onOpen }: Props) {
       {loading && <p className="muted">Cargando…</p>}
       {!loading && error && <p className="muted">{error}</p>}
       {!loading && !error && top.length === 0 && (
-        <p className="muted">Aún no hay usuarios en esta lista. Pon tu visibilidad en «Pública» (Logros → Vitrina) para aparecer.</p>
+        <p className="muted">Aún no hay usuarios en esta lista. Pon tu visibilidad en «Pública» (Usuarios → Privacidad) para aparecer.</p>
       )}
       {!loading && !error && top.length > 0 && (
         <ol className="home-ranking-list">

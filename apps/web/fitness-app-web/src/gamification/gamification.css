@@ -61,3 +61,5 @@
 .home-ranking-list li{display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.04)}
 .home-ranking-list li.self{border:1px solid #ff7a1a}
 .home-ranking-list em{font-style:normal;color:#ff7a1a;font-weight:700}
+.home-ranking-league{display:grid;gap:2px;margin:8px 0;padding:10px 12px;border-radius:10px;background:rgba(255,122,26,.12);border:1px solid rgba(255,122,26,.4)}
+.home-ranking-league strong{color:#ff7a1a;font-size:1.05rem}

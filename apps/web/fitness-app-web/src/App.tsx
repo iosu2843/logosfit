@@ -11,6 +11,7 @@ import { removeItem, saveItem } from './cloud';
 import NutritionModule from './nutrition/NutritionModule';
 import type { NutritionEntry, NutritionProfileData } from './nutrition/types';
 import { readAIData } from './nutrition/store';
+import PrivacySettings from './gamification/PrivacySettings';
 import HomeRanking from './gamification/HomeRanking';
 import GamificationModule, { UnlockToasts, playUnlockSound } from './gamification/GamificationModule';
 import { buildReport, type RankEntry } from './gamification/engine';
@@ -1435,6 +1436,7 @@ export default function App() {
                   <p className="profile-empty-state">Aún no hay perfiles.</p>
                 )}
                 <CloudPanel />
+                <PrivacySettings state={gamState} onState={updateGam} />
               </section>
 
               <form className="profile-editor" onSubmit={saveProfile} style={{ background: theme.card }}>
