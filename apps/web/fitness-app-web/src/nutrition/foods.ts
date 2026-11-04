@@ -75,6 +75,54 @@ const catalogFoods: FoodItem[] = [...dairy, ...protein, ...plants, ...extras].fl
 
 export const referenceFoods: FoodItem[] = [...baseFoods, ...catalogFoods];
 
+/** Medida casera con peso típico (g, o ml en líquidos). Son equivalencias medias de uso común. */
+export type HouseholdUnit = { label: string; amount: number };
+
+const unitRules: Array<[RegExp, HouseholdUnit[]]> = [
+  [/aceite de|manteca de cerdo/, [{ label: '1 cucharada', amount: 13 }, { label: '1 cucharadita', amount: 4.5 }]],
+  [/mantequilla|margarina/, [{ label: '1 cucharada', amount: 14 }, { label: '1 cucharadita', amount: 5 }]],
+  [/mayonesa|alioli|kechup|ketchup|mostaza|pesto|salsa|tahini|crema de (cacahuete|almendra|cacao)|mermelada|miel|sirope/, [{ label: '1 cucharada', amount: 15 }, { label: '1 cucharadita', amount: 5 }]],
+  [/azucar|cacao|maltodextrina|creatina/, [{ label: '1 cucharada', amount: 12 }, { label: '1 cucharadita', amount: 4 }]],
+  [/proteina de|caseina|ganador|avena instantanea/, [{ label: '1 cacito (30 g)', amount: 30 }]],
+  [/queso en lonchas|fiambre|jamon|pechuga de pavo en lonchas|lomo embuchado|salmon ahumado|bacon|chopped|mortadela|pastrami/, [{ label: '1 loncha', amount: 20 }]],
+  [/queso en porciones/, [{ label: '1 porción', amount: 17 }]],
+  [/queso/, [{ label: '1 loncha / porción', amount: 25 }]],
+  [/pan de molde/, [{ label: '1 rebanada', amount: 30 }]],
+  [/pan de barra|pan integral|pan blanco|pan de centeno|pan de espelta/, [{ label: '1 rebanada', amount: 30 }]],
+  [/tostadas|biscotes/, [{ label: '1 unidad', amount: 8 }]],
+  [/tortita de arroz/, [{ label: '1 unidad', amount: 9 }]],
+  [/wrap|pita|bagel|tortilla de maiz/, [{ label: '1 unidad', amount: 60 }]],
+  [/huevo de codorniz/, [{ label: '1 unidad', amount: 10 }]],
+  [/clara/, [{ label: '1 clara', amount: 33 }]],
+  [/yema/, [{ label: '1 yema', amount: 17 }]],
+  [/huevo|tortilla francesa/, [{ label: '1 unidad (M)', amount: 55 }]],
+  [/yogur|skyr|petit suisse|natillas|flan|cuajada|queso batido/, [{ label: '1 unidad', amount: 125 }]],
+  [/manzana|pera|naranja|melocoton|nectarina|platano|aguacate/, [{ label: '1 unidad', amount: 150 }]],
+  [/mandarina|kiwi|ciruela$|albaricoque|higo$/, [{ label: '1 unidad', amount: 80 }]],
+  [/zanahoria|tomate$|pimiento|cebolla$/, [{ label: '1 unidad', amount: 100 }]],
+  [/dátiles|datiles/, [{ label: '1 unidad', amount: 8 }]],
+  [/almendras|nueces|avellanas|pistachos|anacardos|cacahuetes|mezcla de frutos secos/, [{ label: '1 puñado', amount: 30 }]],
+  [/chia|lino|sesamo|girasol|calabaza$|amapola/, [{ label: '1 cucharada', amount: 10 }]],
+  [/avena en copos|muesli|granola|cereales|copos/, [{ label: '1 cucharada', amount: 8 }, { label: '1 taza', amount: 40 }]],
+  [/arroz|pasta|quinoa|cuscus|bulgur|macarrones|espaguetis|lentejas|garbanzos|alubias/, [{ label: '1 taza (cocido)', amount: 160 }]],
+  [/galletas/, [{ label: '1 galleta', amount: 7 }]],
+  [/magdalenas/, [{ label: '1 unidad', amount: 35 }]],
+  [/croissant/, [{ label: '1 unidad', amount: 60 }]],
+  [/chocolate/, [{ label: '1 onza', amount: 10 }]],
+];
+
+const liquidUnits: HouseholdUnit[] = [{ label: '1 vaso', amount: 200 }, { label: '1 taza', amount: 250 }, { label: '1 cucharada', amount: 15 }];
+
+export function householdUnits(food: FoodItem): HouseholdUnit[] {
+  const name = normalizeText(food.name);
+  if (food.unit === 'ml') {
+    if (/aceite|vinagre|salsa de soja|salsa teriyaki|vinagreta/.test(name)) return [{ label: '1 cucharada', amount: 13 }, { label: '1 cucharadita', amount: 4.5 }];
+    return liquidUnits;
+  }
+  const rule = unitRules.find(([pattern]) => pattern.test(name));
+  return rule ? rule[1] : [];
+}
+
 export function searchFoods(foods: FoodItem[], query: string, limit = 8): FoodItem[] {
   const needle = normalizeText(query);
   if (!needle) return [];

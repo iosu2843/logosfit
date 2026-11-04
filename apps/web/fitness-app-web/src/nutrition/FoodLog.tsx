@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { addDaysToKey, dayTotals, entriesByMeal, entryMacros, round0, round1, scalePer100 } from './calc';
 import type { NutritionCtx } from './ctx';
-import { referenceFoods, searchFoods } from './foods';
+import { householdUnits, referenceFoods, searchFoods } from './foods';
 import { duplicateMeals, makeMealEntry, newId } from './store';
 import { mealLabel, mealTypes, type FoodItem, type MealType } from './types';
 
@@ -178,6 +178,10 @@ export default function FoodLog({ ctx }: { ctx: NutritionCtx }) {
                   <form className="nai-form" onSubmit={addPicked}>
                     <p className="nai-wide"><strong>{picked.name}</strong> <small className="nai-muted">({picked.source})</small></p>
                     <label>Cantidad ({picked.unit})<input className="nai-input" inputMode="decimal" autoFocus value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+                    <div className="nai-chips nai-wide" aria-label="Cantidades rápidas">
+                      {[10, 25, 50, 100, 150, 200, 250].map((value) => <button key={value} type="button" className="nai-chip nai-chip-btn" onClick={() => setAmount(String(value))}>{value} {picked.unit}</button>)}
+                      {householdUnits(picked).map((unit) => <button key={unit.label} type="button" className="nai-chip nai-chip-btn" onClick={() => setAmount(String(unit.amount))}>{unit.label} · {unit.amount} {picked.unit}</button>)}
+                    </div>
                     <p className="nai-muted nai-wide">
                       {(() => {
                         const grams = numberOf(amount);

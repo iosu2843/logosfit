@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeText, referenceFoods, searchFoods } from './foods';
+import { householdUnits, normalizeText, referenceFoods, searchFoods } from './foods';
 
 describe('catálogo de alimentos', () => {
   it('tiene ids y nombres únicos', () => {
@@ -15,6 +15,13 @@ describe('catálogo de alimentos', () => {
       return values.some((v) => v < 0) || m.protein + m.carbohydrates + m.fat > 100.5 || Math.abs(m.calories - expected) > Math.max(40, expected * 0.3);
     }).map((food) => food.name);
     expect(bad).toEqual([]);
+  });
+
+  it('ofrece medidas caseras con peso definido', () => {
+    const find = (name: string) => referenceFoods.find((food) => food.name === name)!;
+    expect(householdUnits(find('Queso en lonchas'))).toEqual([{ label: '1 loncha', amount: 20 }]);
+    expect(householdUnits(find('Leche entera')).some((unit) => unit.label === '1 vaso' && unit.amount === 200)).toBe(true);
+    expect(householdUnits(find('Aceite de oliva')).map((unit) => unit.label)).toContain('1 cucharada');
   });
 
   it('distingue variantes y busca por categoría', () => {
