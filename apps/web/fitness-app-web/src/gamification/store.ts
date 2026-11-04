@@ -18,6 +18,7 @@ export const defaultGamState = (): GamState => ({
   showcase: [],
   visibility: 'private',
   hideRankings: false,
+  country: '',
   sound: false,
   custom: [],
 });
@@ -44,6 +45,7 @@ export function normalizeGamState(raw: unknown): GamState {
     showcase: strings(raw.showcase, 6).slice(0, 6),
     visibility: (['private', 'friends', 'public'] as Visibility[]).includes(raw.visibility as Visibility) ? (raw.visibility as Visibility) : 'private',
     hideRankings: raw.hideRankings === true,
+    country: typeof raw.country === 'string' && /^[A-Z]{2}$/.test(raw.country) ? raw.country : '',
     sound: raw.sound === true,
     custom,
   };

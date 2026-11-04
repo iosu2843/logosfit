@@ -39,6 +39,7 @@ export type GamState = {
   showcase: string[];
   visibility: Visibility;
   hideRankings: boolean;
+  country: string;
   sound: boolean;
   custom: CustomMilestone[];
 };

@@ -5,6 +5,7 @@ import { divisions } from './leagues';
 import { cumXP } from './xp';
 import { ironMilestones } from './milestones';
 import { withDate } from './store';
+import { fetchLeaderboard, listFriendRequests, reportScore, respondFriendRequest, sendFriendRequest, submitScore, type OnlineRow, type OnlineScope } from './online';
 import './gamification.css';
 
 const tierIcon: Record<Tier, string> = { bronce: '🥉', plata: '🥈', oro: '🥇', platino: '💠', legendario: '👑' };
@@ -136,10 +137,104 @@ function Cups({ report }: { report: GamReport }) {
   );
 }
 
-function Ranking({ report, state, ranking }: Pick<Props, 'report' | 'state' | 'ranking'>) {
+function OnlineRanking({ report, state, selfName, metric, onState }: { report: GamReport; state: GamState; selfName: string; metric: 'logos' | LeagueMuscle; onState: Props['onState'] }) {
+  const [scope, setScope] = useState<OnlineScope>('global');
+  const [rows, setRows] = useState<OnlineRow[]>([]);
+  const [requests, setRequests] = useState<Array<{ requester: string; display_name: string }>>([]);
+  const [code, setCode] = useState('');
+  const [myCode, setMyCode] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Error de conexión.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const load = (nextScope = scope) => run(async () => {
+    setRows(await fetchLeaderboard(metric, nextScope));
+    setRequests(await listFriendRequests().catch(() => []));
+  });
+
+  const publish = () => run(async () => {
+    const result = await submitScore({
+      name: selfName,
+      country: state.country,
+      visibility: state.visibility,
+      hideRankings: state.hideRankings,
+      logos: report.logos.total,
+      muscles: Object.fromEntries(report.muscles.map((m) => [m.muscle, m.score])),
+    });
+    if (result.friendCode) setMyCode(result.friendCode);
+    setMessage(result.message + (state.visibility === 'private' ? ' Tu visibilidad es «Privado»: no aparecerás en listas ajenas (cámbiala en Vitrina).' : ''));
+    if (result.status === 'ok' || result.status === 'capped') setRows(await fetchLeaderboard(metric, scope));
+  });
+
+  const addFriend = () => run(async () => {
+    const status = await sendFriendRequest(code);
+    setMessage(status === 'not_found' ? 'Código no válido.' : status === 'accepted' ? 'Ya sois amigos.' : 'Solicitud enviada.');
+    setCode('');
+  });
+
+  const report1 = (row: OnlineRow) => {
+    const reason = window.prompt(`Motivo del reporte de ${row.name} (mín. 3 caracteres):`);
+    if (!reason || reason.trim().length < 3) return;
+    void run(async () => setMessage((await reportScore(row.userId, reason.trim())) ? 'Reporte enviado. Con 3 reportes distintos se retira la puntuación para su revisión.' : 'No se pudo reportar.'));
+  };
+
+  return (
+    <article className="gm-card gm-detail">
+      <h3>Clasificación online</h3>
+      <p className="gm-note">Requiere sesión en la nube. El servidor valida rangos, frecuencia y subida máxima diaria, y registra cada envío en un historial de auditoría.</p>
+      <div className="gm-form">
+        <input maxLength={2} placeholder="País (ES)" value={state.country} onChange={(e) => onState((c) => ({ ...c, country: e.target.value.toUpperCase().replace(/[^A-Z]/g, '') }))} />
+        <button type="button" className="gm-btn" disabled={busy} onClick={publish}>Publicar mi puntuación</button>
+        <button type="button" className="gm-btn" disabled={busy} onClick={() => load()}>Actualizar</button>
+      </div>
+      <div className="gm-chips small">
+        {(['global', 'friends', 'country'] as const).map((key) => (
+          <button key={key} type="button" className={scope === key ? 'on' : ''} onClick={() => { setScope(key); void load(key); }}>{{ global: 'Global', friends: 'Amigos', country: 'Mi país' }[key]}</button>
+        ))}
+      </div>
+      <ol className="gm-podium">
+        {rows.map((row) => (
+          <li key={row.userId} className={row.self ? 'self' : ''}>
+            <b>{row.position <= 3 ? ['🥇', '🥈', '🥉'][row.position - 1] : `#${row.position}`}</b>
+            <span>{row.name}{row.country ? ` · ${row.country}` : ''}</span>
+            <em>{row.score}{!row.self && <button type="button" className="gm-link" title="Reportar puntuación sospechosa" onClick={() => report1(row)}> ⚑</button>}</em>
+          </li>
+        ))}
+        {rows.length === 0 && <li><span /><span>Sin resultados todavía. Publica tu puntuación o pulsa Actualizar.</span><span /></li>}
+      </ol>
+      <h4>Amigos</h4>
+      {myCode && <p className="gm-note">Tu código de amigo: <b>{myCode}</b></p>}
+      <div className="gm-form">
+        <input placeholder="Código de amigo" value={code} onChange={(e) => setCode(e.target.value)} />
+        <button type="button" className="gm-btn" disabled={busy || code.trim().length < 4} onClick={addFriend}>Enviar solicitud</button>
+      </div>
+      {requests.map((req) => (
+        <div key={req.requester} className="gm-form">
+          <span>{req.display_name} quiere ser tu amigo</span>
+          <button type="button" className="gm-btn" onClick={() => run(async () => { await respondFriendRequest(req.requester, true); await load(); })}>Aceptar</button>
+          <button type="button" className="gm-link" onClick={() => run(async () => { await respondFriendRequest(req.requester, false); await load(); })}>Rechazar</button>
+        </div>
+      ))}
+      {message && <p className="gm-note" role="status">{message}</p>}
+    </article>
+  );
+}
+
+function Ranking({ report, state, ranking, onState }: Pick<Props, 'report' | 'state' | 'ranking' | 'onState'>) {
   const [metric, setMetric] = useState<'logos' | LeagueMuscle>('logos');
   const rows = buildLeaderboard(ranking, metric);
   const dims = report.logos.dimensions;
+  const selfName = ranking.find((entry) => entry.self)?.name ?? 'Atleta';
   return (
     <section>
       <article className="gm-card gm-detail">
@@ -151,6 +246,7 @@ function Ranking({ report, state, ranking }: Pick<Props, 'report' | 'state' | 'r
         <button type="button" className={metric === 'logos' ? 'on' : ''} onClick={() => setMetric('logos')}>Logos Score</button>
         {leagueMuscles.map((m) => <button key={m} type="button" className={metric === m ? 'on' : ''} onClick={() => setMetric(m)}>{m}</button>)}
       </div>
+      <h3 className="gm-sub">En este dispositivo</h3>
       <ol className="gm-podium">
         {rows.map((row) => (
           <li key={row.id} className={row.self ? 'self' : ''}>
@@ -160,16 +256,13 @@ function Ranking({ report, state, ranking }: Pick<Props, 'report' | 'state' | 'r
           </li>
         ))}
       </ol>
-      <p className="gm-note">
-        Clasificación entre los perfiles de este dispositivo{state.hideRankings ? ' (has ocultado tu posición pública)' : ''}. Los perfiles privados no aparecen en la lista de otros.
-        La clasificación global, los filtros de amigos y país, la validación en servidor y los reportes requieren un backend (pendiente).
-      </p>
+      <p className="gm-note">Los perfiles privados no aparecen en la lista de otros{state.hideRankings ? ' (has ocultado tu posición)' : ''}.</p>
+      <OnlineRanking report={report} state={state} selfName={selfName} metric={metric} onState={onState} />
       <h3 className="gm-sub">Divisiones</h3>
       <div className="gm-chips small">{divisions.map((d) => <span key={d.id} className="gm-pill">{d.name} · {d.min}+</span>)}</div>
     </section>
   );
 }
-
 function Season({ report, state, today, onState }: Pick<Props, 'report' | 'state' | 'today' | 'onState'>) {
   const { season } = report;
   const month = today.slice(0, 7);
@@ -282,7 +375,7 @@ export default function GamificationModule(props: Props) {
       {tab === 'Salón de logros' && <Hall report={report} state={state} onState={onState} />}
       {tab === 'Mis músculos' && <Muscles report={report} />}
       {tab === 'Copas' && <Cups report={report} />}
-      {tab === 'Clasificación' && <Ranking report={report} state={state} ranking={props.ranking} />}
+      {tab === 'Clasificación' && <Ranking report={report} state={state} ranking={props.ranking} onState={onState} />}
       {tab === 'Temporada' && <Season report={report} state={state} today={today} onState={onState} />}
       {tab === 'Vitrina' && <Showcase report={report} state={state} exerciseNames={props.exerciseNames} onState={onState} />}
     </section>

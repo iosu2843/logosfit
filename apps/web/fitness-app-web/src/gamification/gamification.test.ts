@@ -7,6 +7,7 @@ import { collectValidSets } from './validation';
 import { computeMetrics } from './metrics';
 import { bestMark } from './milestones';
 import { defaultGamState, normalizeGamState } from './store';
+import { validatePayload } from './online';
 import type { GamCtx } from './types';
 import type { WorkoutLog } from '../workoutLog';
 
@@ -145,3 +146,13 @@ describe('clasificación y estado', () => {
   });
 });
 
+
+describe('clasificación online', () => {
+  const base = { name: 'A', country: 'ES', visibility: 'public' as const, hideRankings: false, logos: 100, muscles: { Pecho: 50 } };
+  it('valida rangos y país antes de enviar', () => {
+    expect(validatePayload(base)).toBeNull();
+    expect(validatePayload({ ...base, logos: 20000 })).not.toBeNull();
+    expect(validatePayload({ ...base, muscles: { Pecho: -1 } })).not.toBeNull();
+    expect(validatePayload({ ...base, country: 'esp' })).not.toBeNull();
+  });
+});

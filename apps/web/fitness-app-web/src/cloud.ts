@@ -29,6 +29,8 @@ const client: SupabaseClient | null = isCloudConfigured
   ? createClient(supabaseUrl!, supabaseAnonKey!, { auth: { persistSession: true, autoRefreshToken: true } })
   : null;
 
+export const getCloudClient = () => client;
+
 let pushTimer: number | undefined;
 let signedIn = false;
 const statusListeners = new Set<(status: SyncStatus, message?: string) => void>();
