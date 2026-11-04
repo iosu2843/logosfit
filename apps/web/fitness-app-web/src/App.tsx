@@ -996,6 +996,7 @@ export default function App() {
     <div className={`app-shell ${sidebarExpanded ? '' : 'sidebar-collapsed'}`} style={{ background: theme.bg, color: theme.text }}>
       <aside className="sidebar-card" style={{ background: theme.card }}>
         <div className="brand-row">
+          <button aria-label="Ir al inicio" className="brand-home" title="Ir al inicio" type="button" onClick={() => setActiveNav('Inicio')}>
           <img
             alt="Emblema de LOGOSFIT"
             className="brand-logo"
@@ -1006,6 +1007,7 @@ export default function App() {
             <small>Disciplina · Progreso · Equilibrio</small>
           </div>
           <span className="brand-wordmark" aria-hidden="true">LOGOSFIT</span>
+          </button>
           <button
             aria-label={sidebarExpanded ? 'Contraer menú lateral' : 'Expandir menú lateral'}
             aria-expanded={sidebarExpanded}

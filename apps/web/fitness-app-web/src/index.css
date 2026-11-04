@@ -2823,3 +2823,6 @@ h1, h2, h3, p {
 .adherence-bar div { height: 100%; background: #ff9d3d; border-radius: 6px; }
 
 .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.brand-home{display:contents;background:none;border:0;padding:0;margin:0;color:inherit;font:inherit;text-align:inherit;cursor:pointer}
+.brand-home:focus-visible{outline:2px solid #ff7a1a;outline-offset:2px}
