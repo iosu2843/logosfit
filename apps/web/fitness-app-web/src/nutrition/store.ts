@@ -9,7 +9,7 @@ export const NUTRITION_AI_KEY = 'fitness-nutrition-ai-by-profile';
 
 export const emptyPlanDay = (): PlanDay => Object.fromEntries(mealTypes.map((meal) => [meal.id, [] as PlannedItem[]])) as PlanDay;
 
-export const defaultGoalsState = (): GoalsState => ({ mode: null, prefs: defaultPrefs(), weekStart: null, weekly: [], reviews: [] });
+export const defaultGoalsState = (): GoalsState => ({ mode: null, prefs: defaultPrefs(), weekStart: null, weekly: [] });
 
 const goalModeIds: GoalMode[] = ['volume', 'cut', 'recomp', 'maintain', 'habits'];
 
@@ -30,7 +30,6 @@ export function normalizeGoalsState(raw: unknown): GoalsState {
     },
     weekStart: typeof raw.weekStart === 'string' ? raw.weekStart : null,
     weekly: Array.isArray(raw.weekly) ? (raw.weekly as GoalsState['weekly']).filter((goal) => isRecord(goal) && typeof goal.id === 'string' && Number.isFinite(goal.target)) : [],
-    reviews: Array.isArray(raw.reviews) ? (raw.reviews as GoalsState['reviews']) : [],
   };
 }
 

@@ -1,6 +1,5 @@
 import { activityFactor, addDaysToKey, caloriesFromMacros, clamp, lastDays, mifflinBmr, round0, dayTotals } from './calc';
-import { analyzeIntake, analyzeWeight } from './engine';
-import type { GoalMode, GoalPrefs, NutritionEntry, NutritionGoal, ProgressPoint, SafetyFlags, Targets, WeeklyGoal } from './types';
+import type { GoalMode, GoalPrefs, NutritionEntry, NutritionGoal, SafetyFlags, Targets, WeeklyGoal } from './types';
 
 export const goalModes: Array<{ id: GoalMode; label: string; hint: string }> = [
   { id: 'volume', label: 'Volumen', hint: 'Ganar masa muscular con un superávit prudente.' },
@@ -223,77 +222,4 @@ export function weeklyProgress(goal: WeeklyGoal, data: WeekData): WeekProgress {
   }
   const done = auto ? value >= goal.target : goal.manualDone || value >= goal.target;
   return { value, target: goal.target, auto, done, state: done ? 'done' : value > 0 ? 'progress' : 'pending' };
-}
-
-/* Revisión periódica */
-export type GoalReview = {
-  id: string;
-  action: 'keep' | 'increase' | 'decrease' | 'protein' | 'wait';
-  title: string;
-  detail: string;
-  rationale: string[];
-  proposal?: Targets;
-};
-
-export const REVIEW_COOLDOWN_DAYS = 14;
-export const REVIEW_MIN_LOGGED_DAYS = 10;
-
-const weeklyRate: Record<GoalMode, [number, number]> = {
-  volume: [0.1, 0.5],
-  cut: [-1, -0.4],
-  recomp: [-0.25, 0.25],
-  maintain: [-0.25, 0.25],
-  habits: [-0.5, 0.5],
-};
-
-export function reviewGoals(input: { mode: GoalMode; today: string; targets: Targets; bodyWeight: ProgressPoint[]; entriesByDay: Record<string, NutritionEntry[]>; lastChangeDate?: string; blocked: boolean; minCalories?: number }): GoalReview {
-  const { mode, today, targets } = input;
-  if (input.blocked) {
-    return { id: 'review-blocked', action: 'wait', title: 'Revisión no disponible', detail: 'Con tu perfil de seguridad no se proponen ajustes automáticos. Consulta con un profesional sanitario.', rationale: [] };
-  }
-  const weight = analyzeWeight(input.bodyWeight, today);
-  const intake = analyzeIntake(input.entriesByDay, today);
-  const rationale: string[] = [];
-  if (input.lastChangeDate && input.lastChangeDate > addDaysToKey(today, -REVIEW_COOLDOWN_DAYS)) {
-    return { id: 'review-cooldown', action: 'wait', title: 'Cambio reciente', detail: `Cambiaste tus metas hace menos de ${REVIEW_COOLDOWN_DAYS} días: espera a ver su efecto antes de otra revisión.`, rationale: [] };
-  }
-  if (weight.status !== 'ok' || intake.loggedDays < REVIEW_MIN_LOGGED_DAYS) {
-    return {
-      id: 'review-data',
-      action: 'wait',
-      title: 'Aún no hay datos suficientes',
-      detail: 'Para decidir hace falta una tendencia de varias semanas: al menos 4 pesajes en 10 días y 10 días de comidas registradas en las últimas 2 semanas.',
-      rationale: [`Pesajes (28 días): ${weight.points}.`, `Días con comidas (14 días): ${intake.loggedDays}.`],
-    };
-  }
-  rationale.push(`Tendencia de peso: ${weight.weeklyChangeKg >= 0 ? '+' : ''}${Math.round(weight.weeklyChangeKg * 100) / 100} kg/sem (${Math.round(weight.weeklyChangePercent * 100) / 100} % del peso).`);
-  rationale.push(`Ingesta media: ${round0(intake.avgCalories)} kcal frente a un objetivo de ${round0(targets.calories)} (${intake.loggedDays} días).`);
-  const adherence = Math.abs(intake.avgCalories - targets.calories) / targets.calories;
-  if (adherence > 0.15) {
-    return { id: 'review-adherence', action: 'keep', title: 'Primero, ajústate al objetivo actual', detail: 'Tu ingesta real se aleja más del 15 % del objetivo; cambiar el objetivo no sería informativo. Mantén las metas y revisa tu adherencia.', rationale };
-  }
-  const [min, max] = weeklyRate[mode];
-  const percent = weight.weeklyChangePercent;
-  const step = clamp(Math.round((targets.calories * 0.05) / 50) * 50, 100, 250);
-  const floor = input.minCalories ?? MIN_CALORIES;
-  const make = (action: GoalReview['action'], title: string, detail: string, delta: number): GoalReview => {
-    const calories = Math.max(floor, targets.calories + delta);
-    const carbohydrates = Math.max(0, round0((calories - targets.protein * 4 - targets.fat * 9) / 4));
-    return { id: `review-${action}`, action, title, detail, rationale, proposal: { ...targets, calories, carbohydrates } };
-  };
-  if (percent < min - 0.05) {
-    if (mode === 'cut') return make('increase', 'Pierdes peso demasiado rápido', 'Un ritmo mayor del 1 % semanal puede perjudicar el rendimiento y la masa muscular. Se propone subir algo la energía.', step);
-    return make('increase', 'El peso baja por debajo de lo previsto', 'Tu tendencia es inferior al rango de tu objetivo. Se propone un pequeño aumento de energía.', step);
-  }
-  if (percent > max + 0.05) {
-    if (mode === 'volume') return make('decrease', 'Ganas peso más rápido de lo necesario', 'Un ritmo mayor al 0,5 % semanal suele añadir grasa. Se propone reducir ligeramente la energía.', -step);
-    return make('decrease', 'El peso sube por encima de lo previsto', 'Tu tendencia supera el rango de tu objetivo. Se propone un pequeño ajuste a la baja.', -step);
-  }
-  if (mode === 'cut' && percent > -0.4 + 0.05 && percent <= 0.05) {
-    return make('decrease', 'La pérdida de peso se ha estancado', 'Con buena adherencia el peso no baja. Se propone un recorte pequeño; valora también esperar otras 2 semanas.', -step);
-  }
-  if (intake.avgProtein < targets.protein * 0.85) {
-    return { id: 'review-protein', action: 'protein', title: 'Refuerza la proteína', detail: 'Tu peso evoluciona como se espera, pero la proteína media queda por debajo del 85 % del objetivo. No hace falta cambiar las calorías.', rationale: [...rationale, `Proteína media: ${round0(intake.avgProtein)} g de ${round0(targets.protein)} g.`] };
-  }
-  return { id: 'review-keep', action: 'keep', title: 'Mantén tus metas', detail: 'Tu evolución encaja con el objetivo. No se recomienda cambiar nada ahora.', rationale };
 }

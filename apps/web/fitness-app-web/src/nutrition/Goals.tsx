@@ -3,8 +3,9 @@ import { ProgressBar } from './charts';
 import { round0, toDateKey } from './calc';
 import type { NutritionCtx } from './ctx';
 import {
-  computeGoals, defaultFlags, goalModes, goalToMode, modeToGoal, reviewGoals, weeklyGoalTemplates, weeklyProgress, type GoalsResult,
+  computeGoals, defaultFlags, goalModes, goalToMode, modeToGoal, weeklyGoalTemplates, weeklyProgress, type GoalsResult,
 } from './nutritionGoalsEngine';
+import ManualTargets from './ManualTargets';
 import { newId } from './store';
 import { summarizeTraining } from './training';
 import type { GoalMode, GoalPrefs, GoalsState, SafetyFlags, Targets, WeeklyGoal } from './types';
@@ -25,7 +26,7 @@ export default function Goals({ ctx }: { ctx: NutritionCtx }) {
   const goals = ai.goals;
   const prefs = goals.prefs;
   const mode: GoalMode = goals.mode ?? goalToMode(ctx.goal);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [customName, setCustomName] = useState('');
   const training = useMemo(() => summarizeTraining(ctx.plan, ctx.metrics), [ctx.plan, ctx.metrics]);
   const weekStart = toDateKey(weekStartOf(new Date(`${today}T12:00:00`)));
@@ -53,13 +54,6 @@ export default function Goals({ ctx }: { ctx: NutritionCtx }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStart]);
 
-  const blocked = result.status === 'blocked';
-  const lastChange = [...goals.reviews].reverse().find((item) => item.action === 'apply')?.date;
-  const review = useMemo(
-    () => reviewGoals({ mode: result.mode, today, targets: ctx.targets, bodyWeight: ctx.bodyWeight, entriesByDay: ctx.entriesByDay, lastChangeDate: lastChange, blocked }),
-    [result.mode, today, ctx.targets, ctx.bodyWeight, ctx.entriesByDay, lastChange, blocked],
-  );
-
   const applyTargets = (targets: Targets, nextMode: GoalMode, title: string, water?: number) => {
     const from = ctx.targets;
     ctx.setTargets(targets);
@@ -68,9 +62,9 @@ export default function Goals({ ctx }: { ctx: NutritionCtx }) {
       ...current,
       goal: modeToGoal[nextMode],
       adjustments: [...current.adjustments, { date: today, summary: title, from, to: targets }],
-      goals: { ...current.goals, mode: nextMode, reviews: [...current.goals.reviews, { date: today, title, action: 'apply', from, to: targets }] },
+      goals: { ...current.goals, mode: nextMode },
     }));
-    setConfirming(null);
+    setConfirming(false);
   };
 
   const selectMode = (next: GoalMode) => updateGoals((current) => ({ ...current, mode: next }));
@@ -158,44 +152,19 @@ export default function Goals({ ctx }: { ctx: NutritionCtx }) {
             </div>
             <p className="nai-muted">Tus metas actuales: {round0(current.calories)} kcal · P {round0(current.protein)} g · C {round0(current.carbohydrates)} g · G {round0(current.fat)} g. Ningún cambio se aplica sin tu confirmación.</p>
             {differs ? (
-              confirming === 'apply' ? (
+              confirming ? (
                 <div className="nai-actions">
                   <span>¿Aplicar estas metas?</span>
                   <button type="button" className="nai-btn nai-primary" onClick={() => applyTargets(result.targets, result.mode, `Metas ${modeLabel}`, result.waterMl)}>Sí, aplicar</button>
-                  <button type="button" className="nai-btn" onClick={() => setConfirming(null)}>Cancelar</button>
+                  <button type="button" className="nai-btn" onClick={() => setConfirming(false)}>Cancelar</button>
                 </div>
-              ) : <button type="button" className="nai-btn nai-primary" onClick={() => setConfirming('apply')}>Aplicar estas metas…</button>
+              ) : <button type="button" className="nai-btn nai-primary" onClick={() => setConfirming(true)}>Aplicar estas metas…</button>
             ) : <p className="nai-muted">Tus metas ya coinciden con esta propuesta.</p>}
             <details className="nai-details">
               <summary>¿Por qué tengo estas metas?</summary>
               <ul>{result.rationale.map((line) => <li key={line}>{line}</li>)}</ul>
               <p className="nai-muted">Fórmulas generales y rangos habituales; la respuesta individual varía.</p>
             </details>
-          </section>
-
-          <section className="nai-card">
-            <header className="nai-card-head"><h3>Revisión periódica</h3><span className="nai-chip">{review.action === 'keep' ? 'Mantener' : review.action === 'wait' ? 'Esperar' : 'Ajuste propuesto'}</span></header>
-            <strong>{review.title}</strong>
-            <p>{review.detail}</p>
-            {review.rationale.length > 0 && <details className="nai-details"><summary>¿Por qué?</summary><ul>{review.rationale.map((line) => <li key={line}>{line}</li>)}</ul></details>}
-            {review.proposal && (
-              <div className="nai-proposal">
-                <p><strong>Propuesta:</strong> {round0(ctx.targets.calories)} → <strong>{round0(review.proposal.calories)} kcal</strong> · C {round0(review.proposal.carbohydrates)} g (proteína y grasas sin cambios)</p>
-                {confirming === review.id ? (
-                  <div className="nai-actions">
-                    <span>¿Confirmas el cambio?</span>
-                    <button type="button" className="nai-btn nai-primary" onClick={() => applyTargets(review.proposal as Targets, result.mode, review.title)}>Sí, aplicar</button>
-                    <button type="button" className="nai-btn" onClick={() => setConfirming(null)}>Cancelar</button>
-                  </div>
-                ) : (
-                  <div className="nai-actions">
-                    <button type="button" className="nai-btn nai-primary" onClick={() => setConfirming(review.id)}>Aplicar propuesta…</button>
-                    <button type="button" className="nai-btn" onClick={() => updateGoals((state) => ({ ...state, reviews: [...state.reviews, { date: today, title: review.title, action: 'dismiss' }] }))}>Mantener como está</button>
-                  </div>
-                )}
-              </div>
-            )}
-            <p className="nai-muted">Se basa en tendencias de varias semanas y no cambia nada por un solo día o pesaje.</p>
           </section>
         </>
       )}
@@ -230,16 +199,7 @@ export default function Goals({ ctx }: { ctx: NutritionCtx }) {
         </div>
       </section>
 
-      {goals.reviews.length > 0 && (
-        <section className="nai-card">
-          <header className="nai-card-head"><h3>Historial de revisiones</h3></header>
-          <ul className="nai-list">
-            {[...goals.reviews].reverse().slice(0, 10).map((item, index) => (
-              <li key={`${item.date}-${index}`}><div><strong>{item.date} · {item.title}</strong><small>{item.action === 'apply' && item.to ? `Aplicado: ${round0(item.from?.calories ?? 0)} → ${round0(item.to.calories)} kcal` : 'Sin cambios'}</small></div></li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <ManualTargets ctx={ctx} />
 
       <p className="nai-disclaimer">Información orientativa basada en fórmulas generales. No sustituye el consejo de un médico o dietista-nutricionista, especialmente si eres menor de edad, estás embarazada o tienes una condición de salud.</p>
     </div>

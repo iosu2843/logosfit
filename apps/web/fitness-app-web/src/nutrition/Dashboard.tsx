@@ -22,7 +22,7 @@ export default function Dashboard({ ctx, goTo }: { ctx: NutritionCtx; goTo: (tab
     <div className="nai-grid-2">
       {ctx.provisional && (
         <div className="nai-notice nai-span">
-          Objetivos provisionales ({round0(targets.calories)} kcal). Complétalos en <button type="button" className="nai-link" onClick={() => goTo('planner')}>Planificador</button> para que las recomendaciones sean fiables.
+          Objetivos provisionales ({round0(targets.calories)} kcal). Complétalos en <button type="button" className="nai-link" onClick={() => goTo('goals')}>Metas</button> para que las recomendaciones sean fiables.
         </div>
       )}
 

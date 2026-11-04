@@ -670,18 +670,7 @@ h1, h2, h3, p {
   cursor: default;
 }
 
-.nutrition-screen {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  animation: fadeUp 0.35s ease;
-}
 
-.nutrition-date {
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 0.82rem;
-  text-transform: capitalize;
-}
 
 .nutrition-goals {
   display: grid;
@@ -775,62 +764,14 @@ h1, h2, h3, p {
 }
 
 .nutrition-goal-card,
-.nutrition-log-panel {
-  min-width: 0;
-  padding: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.16);
-}
 
-.nutrition-goal-card {
-  display: grid;
-  gap: 16px;
-}
 
-.nutrition-goal-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
 
-.nutrition-goal-heading h2 {
-  font-size: 1.7rem;
-  line-height: 1.2;
-}
 
-.nutrition-goal-heading h2 small {
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 0.88rem;
-}
 
-.nutrition-goal-heading h2 span {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.82rem;
-  font-weight: 500;
-}
 
-.nutrition-symbol {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  place-items: center;
-  border-radius: var(--radius-md);
-  font-size: 0.86rem;
-  font-weight: 800;
-}
 
-.protein-symbol {
-  color: #bce8a8;
-  background: rgba(116, 177, 85, 0.15);
-}
 
-.water-symbol {
-  color: #9ed9e8;
-  background: rgba(67, 153, 182, 0.16);
-}
 
 .nutrition-progress-track {
   height: 10px;
@@ -855,73 +796,19 @@ h1, h2, h3, p {
 }
 
 .nutrition-target-field,
-.nutrition-intake-form label {
-  display: grid;
-  min-width: 0;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.72rem;
-}
 
 .nutrition-target-field > span,
-.nutrition-intake-form label > span {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-}
 
 .nutrition-target-field input,
-.nutrition-intake-form input {
-  width: 100%;
-  min-width: 0;
-  height: 38px;
-  padding: 0 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-sm);
-  outline: none;
-  color: #fff;
-  background: #171817;
-  font: inherit;
-  font-size: 0.82rem;
-}
 
 .nutrition-target-field input:focus,
-.nutrition-intake-form input:focus {
-  border-color: #ff7a00;
-  box-shadow: 0 0 0 2px rgba(255, 157, 61, 0.15);
-}
 
 .nutrition-target-field small,
-.nutrition-intake-form label small {
-  color: rgba(255, 255, 255, 0.5);
-}
 
-.nutrition-intake-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 10px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
 
-.nutrition-log-panel {
-  display: grid;
-  gap: 12px;
-}
 
-.nutrition-log-panel .section-header {
-  margin-bottom: 0;
-}
 
-.nutrition-log-panel .section-header h2 {
-  font-size: 1.05rem;
-}
 
-.nutrition-entry-list {
-  display: grid;
-}
 
 .nutrition-entry {
   display: grid;
@@ -936,185 +823,39 @@ h1, h2, h3, p {
   border-bottom: 0;
 }
 
-.nutrition-entry-mark {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
 
-.protein-mark {
-  background: #8fbd6a;
-}
 
-.water-mark {
-  background: #58aabd;
-}
 
-.nutrition-entry-info {
-  display: grid;
-  gap: 3px;
-}
 
 .nutrition-entry-info strong,
-.nutrition-entry-amount {
-  font-size: 0.82rem;
-}
 
-.nutrition-entry-info small {
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 0.68rem;
-}
 
-.nutrition-entry-amount {
-  color: rgba(255, 255, 255, 0.78);
-  white-space: nowrap;
-}
 
-.nutrition-empty-state {
-  padding: 14px 0 4px;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.82rem;
-}
 
-.nutrition-macro-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
 
-.nutrition-macro-summary article {
-  display: grid;
-  gap: 6px;
-  padding: 15px 17px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.035);
-}
 
-.nutrition-macro-summary span {
-  color: rgba(255, 255, 255, 0.54);
-  font-size: 0.7rem;
-}
 
-.nutrition-macro-summary strong {
-  font-size: 1.14rem;
-}
 
-.nutrition-macro-summary small {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.74rem;
-  font-weight: 500;
-}
 
-.nutrition-meal-panel {
-  display: grid;
-  gap: 13px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.16);
-}
 
-.nutrition-meal-panel .section-header {
-  margin: 0;
-}
 
-.nutrition-meal-panel .section-header h2 {
-  font-size: 1.08rem;
-}
 
-.nutrition-meal-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 12px;
-}
 
-.nutrition-meal-form label {
-  display: grid;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 0.74rem;
-}
 
-.nutrition-meal-form textarea {
-  width: 100%;
-  min-height: 76px;
-  padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-sm);
-  outline: none;
-  color: #fff;
-  background: #171817;
-  font: inherit;
-  font-size: 0.84rem;
-  resize: vertical;
-}
 
-.nutrition-meal-form textarea:focus {
-  border-color: #ff7a00;
-  box-shadow: 0 0 0 2px rgba(255, 157, 61, 0.15);
-}
 
 .nutrition-meal-form .primary-btn:disabled,
-.nutrition-analysis-result .primary-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
 
 .nutrition-estimate-note,
-.nutrition-analysis-error {
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 0.68rem;
-}
 
-.nutrition-analysis-error {
-  color: #ffad9f;
-}
 
-.nutrition-analysis-result {
-  display: grid;
-  gap: 12px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
 
-.nutrition-analysis-foods {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.78rem;
-}
 
-.macro-analysis-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
 
-.macro-analysis-grid > div {
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
-}
 
-.macro-analysis-grid span {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.65rem;
-}
 
-.macro-analysis-grid strong {
-  font-size: 0.78rem;
-}
 
-.nutrition-analysis-result > .primary-btn {
-  justify-self: end;
-}
 
-.meal-mark {
-  background: #e2ac68;
-}
 
 .exercise-item {
   transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;

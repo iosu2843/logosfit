@@ -8,9 +8,8 @@ import CloudPanel from './CloudPanel';
 import NumInput from './NumInput';
 import { bestOneRepMax, countCompletedExercises, currentStreak, dayHasRecord, isDayCompleted, isDayStarted, personalBest, recentSessions, recordIds, recoveryWarnings, sessionSets, sessionVolume, setExerciseProgress, shiftWeeks, suggestNextWeight, suggestRestSeconds, topWeight, volumeByGroup, weekStartOf, weeklyAdherence, localKey, type SetLog, type WorkoutLog } from './workoutLog';
 import { removeItem, saveItem } from './cloud';
-import { analyzeMealDescription, type MealAnalysis } from './nutritionAnalyzer';
 import NutritionModule from './nutrition/NutritionModule';
-import type { NutritionEntry, NutritionKind, NutritionProfileData } from './nutrition/types';
+import type { NutritionEntry, NutritionProfileData } from './nutrition/types';
 
 const nextWeight = adjustWeight({
   lastWeight: 40,
@@ -383,11 +382,6 @@ export default function App() {
   const [progressDraftProfileId, setProgressDraftProfileId] = useState('');
   const [progressExerciseName, setProgressExerciseName] = useState('');
   const [progressDayIndex, setProgressDayIndex] = useState(() => new Date().getDay());
-  const [proteinDraft, setProteinDraft] = useState('');
-  const [waterDraft, setWaterDraft] = useState('');
-  const [mealDescription, setMealDescription] = useState('');
-  const [mealAnalysis, setMealAnalysis] = useState<MealAnalysis | null>(null);
-  const [mealAnalysisError, setMealAnalysisError] = useState('');
   const [profiles, setProfiles] = useState(readSavedProfiles);
   const [activeProfileId, setActiveProfileId] = useState(readActiveProfileId);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(() => {
@@ -609,58 +603,6 @@ export default function App() {
     updateNutritionData((current) => ({ ...current, [goal]: value }));
   };
 
-  const recordNutritionIntake = (kind: NutritionKind, amountDraft: string) => {
-    const amount = Number(amountDraft);
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const date = localDateKey();
-    const entry: NutritionEntry = {
-      id: `nutrition-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      timestamp: new Date().toISOString(),
-      kind,
-      amount,
-    };
-
-    updateNutritionData((current) => ({
-      ...current,
-      entriesByDay: {
-        ...current.entriesByDay,
-        [date]: [...(current.entriesByDay[date] ?? []), entry],
-      },
-    }));
-    if (kind === 'protein') setProteinDraft('');
-    else setWaterDraft('');
-  };
-
-  const analyzeMealDraft = () => {
-    const analysis = analyzeMealDescription(mealDescription);
-    setMealAnalysis(analysis);
-    setMealAnalysisError(analysis ? '' : 'No reconocí alimentos. Añade un alimento conocido y, si puedes, su cantidad en gramos.');
-  };
-
-  const saveAnalyzedMeal = () => {
-    if (!mealAnalysis || !mealDescription.trim()) return;
-    const date = localDateKey();
-    const entry: NutritionEntry = {
-      id: `meal-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      timestamp: new Date().toISOString(),
-      kind: 'meal',
-      amount: 0,
-      description: mealDescription.trim(),
-      macros: mealAnalysis.macros,
-      foods: mealAnalysis.foods,
-    };
-    updateNutritionData((current) => ({
-      ...current,
-      entriesByDay: {
-        ...current.entriesByDay,
-        [date]: [...(current.entriesByDay[date] ?? []), entry],
-      },
-    }));
-    setMealDescription('');
-    setMealAnalysis(null);
-    setMealAnalysisError('');
-  };
-
   const recordBodyWeight = () => {
     const value = Number(bodyWeightFieldValue);
     if (!Number.isFinite(value) || value <= 0) return;
@@ -728,8 +670,6 @@ export default function App() {
     setProfileDraft(profileDraftFrom(profile));
     setProgressDraftProfileId('');
     setProgressExerciseName('');
-    setProteinDraft('');
-    setWaterDraft('');
     saveItem('fitness-active-profile', profile.id);
   };
 
@@ -1368,134 +1308,6 @@ export default function App() {
             exerciseLoads={progressHistory.exerciseLoads}
             trainedDates={Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).map(([date]) => date)}
             onWaterGoal={(ml) => updateNutritionGoal('waterGoalMl', ml)}
-            legacy={
-          <section className="nutrition-screen">
-            <header className="topbar">
-              <div>
-                <p className="eyebrow">Registro diario · {activeProfile?.name ?? 'Perfil local'}</p>
-                <h1>Nutrición</h1>
-              </div>
-              <span className="nutrition-date">{new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</span>
-            </header>
-
-            <section className="nutrition-goals">
-              <article className="nutrition-goal-card" style={{ background: theme.card }}>
-                <div className="nutrition-goal-heading">
-                  <div>
-                    <p className="eyebrow muted">Proteína</p>
-                    <h2>{proteinToday} <small>g</small><span> / {nutritionData.proteinGoalGrams} g</span></h2>
-                  </div>
-                  <span className="nutrition-symbol protein-symbol">P</span>
-                </div>
-                <div className="nutrition-progress-track" role="progressbar" aria-label="Objetivo diario de proteína" aria-valuemin={0} aria-valuemax={nutritionData.proteinGoalGrams} aria-valuenow={Math.min(proteinToday, nutritionData.proteinGoalGrams)}>
-                  <span className="protein-progress-fill" style={{ width: `${Math.min(100, (proteinToday / nutritionData.proteinGoalGrams) * 100)}%` }} />
-                </div>
-                <label className="nutrition-target-field">
-                  Objetivo diario
-                  <span><NumInput aria-label="Objetivo diario de proteína en gramos" min="1" max="1000" value={nutritionData.proteinGoalGrams} onChange={(event) => updateNutritionGoal('proteinGoalGrams', Number(event.target.value))} /> g</span>
-                </label>
-                <form className="nutrition-intake-form" onSubmit={(event) => { event.preventDefault(); recordNutritionIntake('protein', proteinDraft); }}>
-                  <label>
-                    Añadir proteína
-                    <span><input aria-label="Gramos de proteína ingeridos" type="number" min="1" max="1000" placeholder="Cantidad" value={proteinDraft} onChange={(event) => setProteinDraft(event.target.value)} /><small>g</small></span>
-                  </label>
-                  <button className="primary-btn" type="submit" disabled={!proteinDraft || Number(proteinDraft) <= 0}>Registrar</button>
-                </form>
-              </article>
-
-              <article className="nutrition-goal-card" style={{ background: theme.card }}>
-                <div className="nutrition-goal-heading">
-                  <div>
-                    <p className="eyebrow muted">Agua</p>
-                    <h2>{(waterToday / 1000).toFixed(1)} <small>L</small><span> / {(nutritionData.waterGoalMl / 1000).toFixed(1)} L</span></h2>
-                  </div>
-                  <span className="nutrition-symbol water-symbol">H₂O</span>
-                </div>
-                <div className="nutrition-progress-track" role="progressbar" aria-label="Objetivo diario de agua" aria-valuemin={0} aria-valuemax={nutritionData.waterGoalMl} aria-valuenow={Math.min(waterToday, nutritionData.waterGoalMl)}>
-                  <span className="water-progress-fill" style={{ width: `${Math.min(100, (waterToday / nutritionData.waterGoalMl) * 100)}%` }} />
-                </div>
-                <label className="nutrition-target-field">
-                  Objetivo diario
-                  <span><NumInput aria-label="Objetivo diario de agua en mililitros" min="250" max="10000" step="250" value={nutritionData.waterGoalMl} onChange={(event) => updateNutritionGoal('waterGoalMl', Number(event.target.value))} /> ml</span>
-                </label>
-                <form className="nutrition-intake-form" onSubmit={(event) => { event.preventDefault(); recordNutritionIntake('water', waterDraft); }}>
-                  <label>
-                    Añadir agua
-                    <span><input aria-label="Mililitros de agua bebidos" type="number" min="1" max="5000" step="50" placeholder="Cantidad" value={waterDraft} onChange={(event) => setWaterDraft(event.target.value)} /><small>ml</small></span>
-                  </label>
-                  <button className="primary-btn" type="submit" disabled={!waterDraft || Number(waterDraft) <= 0}>Registrar</button>
-                </form>
-              </article>
-            </section>
-
-            <section className="nutrition-macro-summary" aria-label="Macronutrientes estimados de hoy">
-              <article><span>Kcal aproximadas</span><strong>{caloriesToday} <small>kcal</small></strong></article>
-              <article><span>Carbohidratos</span><strong>{carbohydratesToday.toFixed(1)} <small>g</small></strong></article>
-              <article><span>Grasas</span><strong>{fatToday.toFixed(1)} <small>g</small></strong></article>
-            </section>
-
-            <section className="nutrition-meal-panel" style={{ background: theme.card }}>
-              <div className="section-header">
-                <div>
-                  <p className="eyebrow muted">Estimación local</p>
-                  <h2>Analizar comida</h2>
-                </div>
-              </div>
-              <form className="nutrition-meal-form" onSubmit={(event) => { event.preventDefault(); analyzeMealDraft(); }}>
-                <label>
-                  ¿Qué has comido?
-                  <textarea aria-label="Descripción de la comida" rows={3} maxLength={500} placeholder="Ej.: 150 g de pollo, 200 g de arroz cocido y 1 huevo" value={mealDescription} onChange={(event) => { setMealDescription(event.target.value); setMealAnalysis(null); setMealAnalysisError(''); }} />
-                </label>
-                <button className="primary-btn" type="submit" disabled={!mealDescription.trim()}>Analizar comida</button>
-              </form>
-              <p className="nutrition-estimate-note">Estimación orientativa según alimentos reconocidos y cantidades. Revisa etiquetas para mayor precisión.</p>
-              {mealAnalysisError && <p className="nutrition-analysis-error" role="alert">{mealAnalysisError}</p>}
-              {mealAnalysis && (
-                <div className="nutrition-analysis-result">
-                  <div className="nutrition-analysis-foods">Alimentos reconocidos: {mealAnalysis.foods.join(', ')}</div>
-                  <div className="macro-analysis-grid">
-                    <div><span>Calorías</span><strong>{mealAnalysis.macros.calories} kcal</strong></div>
-                    <div><span>Proteína</span><strong>{mealAnalysis.macros.protein} g</strong></div>
-                    <div><span>Carbohidratos</span><strong>{mealAnalysis.macros.carbohydrates} g</strong></div>
-                    <div><span>Grasas</span><strong>{mealAnalysis.macros.fat} g</strong></div>
-                  </div>
-                  <button className="primary-btn" type="button" onClick={saveAnalyzedMeal}>Guardar comida</button>
-                </div>
-              )}
-            </section>
-
-            <section className="nutrition-log-panel" style={{ background: theme.card }}>
-              <div className="section-header">
-                <div>
-                  <p className="eyebrow muted">{new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' }).format(new Date())}</p>
-                  <h2>Registro de hoy</h2>
-                </div>
-                <span>{nutritionEntriesToday.length} entradas</span>
-              </div>
-              {nutritionEntriesToday.length ? (
-                <div className="nutrition-entry-list">
-                  {[...nutritionEntriesToday].reverse().map((entry) => (
-                    <article className="nutrition-entry" key={entry.id}>
-                      <span className={`nutrition-entry-mark ${entry.kind === 'protein' ? 'protein-mark' : entry.kind === 'water' ? 'water-mark' : 'meal-mark'}`} />
-                      <div className="nutrition-entry-info">
-                        <strong>{entry.kind === 'meal' ? entry.description : entry.kind === 'protein' ? 'Proteína' : 'Agua'}</strong>
-                        <small>
-                          {new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(new Date(entry.timestamp))}
-                          {entry.kind === 'meal' && entry.macros ? ` · ${entry.macros.calories} kcal · P ${entry.macros.protein} g · C ${entry.macros.carbohydrates} g · G ${entry.macros.fat} g` : ''}
-                        </small>
-                      </div>
-                      <strong className="nutrition-entry-amount">
-                        {entry.kind === 'meal' ? `${entry.macros?.calories ?? 0} kcal` : `+${entry.amount} ${entry.kind === 'protein' ? 'g' : 'ml'}`}
-                      </strong>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="nutrition-empty-state">Todavía no hay consumos registrados para hoy.</p>
-              )}
-            </section>
-          </section>
-            }
           />
         ) : activeNav === 'Usuarios' ? (
           <section className="users-screen">

@@ -1,6 +1,10 @@
-import type { MacroTotals } from '../nutritionAnalyzer';
 
-export type { MacroTotals };
+export type MacroTotals = {
+  calories: number;
+  protein: number;
+  carbohydrates: number;
+  fat: number;
+};
 
 export type Macros = MacroTotals & { fiber?: number };
 
@@ -93,13 +97,11 @@ export type WeeklyGoal = {
   /** Marcado manual como completada (solo metas sin métrica automática). */
   manualDone: boolean;
 };
-export type GoalReviewRecord = { date: string; title: string; action: 'keep' | 'apply' | 'dismiss'; from?: Targets; to?: Targets };
 export type GoalsState = {
   mode: GoalMode | null;
   prefs: GoalPrefs;
   weekStart: string | null;
   weekly: WeeklyGoal[];
-  reviews: GoalReviewRecord[];
 };
 
 export type NutritionAIData = {

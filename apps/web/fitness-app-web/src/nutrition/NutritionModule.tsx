@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import './nutrition.css';
 import Dashboard from './Dashboard';
 import Evolution from './Evolution';
@@ -13,7 +13,7 @@ import { useNutritionAI } from './store';
 import type { MetricsLike, TrainingDayLike } from './training';
 import type { NutritionEntry, ProgressPoint, Targets } from './types';
 
-type TabId = 'summary' | 'goals' | 'diary' | 'planner' | 'insights' | 'evolution' | 'quick';
+type TabId = 'summary' | 'goals' | 'diary' | 'planner' | 'insights' | 'evolution';
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'summary', label: 'Resumen' },
@@ -22,7 +22,6 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'planner', label: 'Planificador' },
   { id: 'insights', label: 'Recomendaciones' },
   { id: 'evolution', label: 'Evolución' },
-  { id: 'quick', label: 'Registro rápido' },
 ];
 
 export type NutritionModuleProps = {
@@ -40,8 +39,6 @@ export type NutritionModuleProps = {
   exerciseLoads: Record<string, ProgressPoint[]>;
   trainedDates: string[];
   onWaterGoal: (ml: number) => void;
-  /** Pantalla de registro rápido original, conservada sin cambios. */
-  legacy: ReactNode;
 };
 
 export default function NutritionModule(props: NutritionModuleProps) {
@@ -99,7 +96,6 @@ export default function NutritionModule(props: NutritionModuleProps) {
         {tab === 'planner' && <Planner ctx={ctx} />}
         {tab === 'insights' && <Insights ctx={ctx} />}
         {tab === 'evolution' && <Evolution ctx={ctx} />}
-        {tab === 'quick' && props.legacy}
       </div>
     </section>
   );

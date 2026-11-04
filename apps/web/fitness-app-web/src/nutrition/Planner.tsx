@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
-import { addMacros, emptyMacros, entriesByMeal, entryMacros, goalLabels, parseDateKey, recipePerServing, recipeTotals, round0, round1, scalePer100, splitByMeals, withCarbsForCalories } from './calc';
+import { addMacros, emptyMacros, entriesByMeal, entryMacros, parseDateKey, recipePerServing, recipeTotals, round0, round1, scalePer100, splitByMeals } from './calc';
 import type { NutritionCtx } from './ctx';
 import { referenceFoods, searchFoods } from './foods';
 import { emptyPlanDay, makeMealEntry, newId } from './store';
-import { mealTypes, type Macros, type MealType, type NutritionGoal, type PlanDay, type PlannedItem, type Recipe, type RecipeIngredient, type Targets } from './types';
-import { suggestTargetsFromProfile } from './targets';
+import { mealTypes, type Macros, type MealType, type PlanDay, type PlannedItem, type Recipe, type RecipeIngredient } from './types';
 
 const parse = (text: string) => {
   const value = Number(text.replace(',', '.'));
@@ -13,67 +12,6 @@ const parse = (text: string) => {
 const weekdays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const weekdayOrder = [1, 2, 3, 4, 5, 6, 0];
 const macroText = (macros: Macros) => `${round0(macros.calories)} kcal · P ${round1(macros.protein)} · C ${round1(macros.carbohydrates)} · G ${round1(macros.fat)}`;
-
-function TargetsEditor({ ctx }: { ctx: NutritionCtx }) {
-  const [goal, setGoal] = useState<NutritionGoal>(ctx.goal);
-  const [draft, setDraft] = useState({ calories: String(ctx.targets.calories), protein: String(ctx.targets.protein), fat: String(ctx.targets.fat) });
-  const [split, setSplit] = useState<Record<MealType, string>>(() => Object.fromEntries(mealTypes.map((meal) => [meal.id, String(ctx.ai.mealSplit[meal.id])])) as Record<MealType, string>);
-  const [message, setMessage] = useState('');
-
-  const calories = parse(draft.calories);
-  const protein = parse(draft.protein);
-  const fat = parse(draft.fat);
-  const valid = calories !== null && protein !== null && fat !== null && calories >= 800 && calories <= 8000 && protein <= 500 && fat <= 400;
-  const preview: Targets | null = valid ? withCarbsForCalories({ calories, protein, fat, carbohydrates: 0 }) : null;
-  const splitTotal = mealTypes.reduce((sum, meal) => sum + (parse(split[meal.id]) ?? 0), 0);
-
-  const recalc = () => {
-    const suggested = suggestTargetsFromProfile(ctx.profile, goal);
-    if (!suggested) return setMessage('Completa peso, altura y edad en tu perfil para calcular una estimación.');
-    setDraft({ calories: String(suggested.calories), protein: String(suggested.protein), fat: String(suggested.fat) });
-    setMessage('Estimación basada en la fórmula de Mifflin-St Jeor y tu nivel de actividad. Es un punto de partida: ajústala según tu evolución.');
-  };
-
-  const save = () => {
-    if (!preview) return setMessage('Revisa los valores: calorías entre 800 y 8000.');
-    if (Math.abs(splitTotal - 100) > 1) return setMessage('El reparto de comidas debe sumar 100 %.');
-    if (preview.carbohydrates === 0 && preview.calories > 0) setMessage('Atención: con esos valores no quedan calorías para los carbohidratos.');
-    ctx.setTargets(preview);
-    ctx.updateAI((current) => ({ ...current, goal, mealSplit: Object.fromEntries(mealTypes.map((meal) => [meal.id, parse(split[meal.id]) ?? 0])) as Record<MealType, number> }));
-    setMessage('Objetivos guardados.');
-  };
-
-  return (
-    <section className="nai-card">
-      <header className="nai-card-head"><h3>Objetivos</h3>{ctx.provisional && <span className="nai-chip">Provisional</span>}</header>
-      <div className="nai-chips" role="radiogroup" aria-label="Objetivo">
-        {(Object.keys(goalLabels) as NutritionGoal[]).map((id) => (
-          <button key={id} type="button" role="radio" aria-checked={goal === id} className={`nai-chip nai-chip-btn${goal === id ? ' active' : ''}`} onClick={() => setGoal(id)}>{goalLabels[id]}</button>
-        ))}
-      </div>
-      <div className="nai-form">
-        <label>Calorías (kcal)<input className="nai-input" inputMode="decimal" value={draft.calories} onChange={(event) => setDraft({ ...draft, calories: event.target.value })} /></label>
-        <label>Proteínas (g)<input className="nai-input" inputMode="decimal" value={draft.protein} onChange={(event) => setDraft({ ...draft, protein: event.target.value })} /></label>
-        <label>Grasas (g)<input className="nai-input" inputMode="decimal" value={draft.fat} onChange={(event) => setDraft({ ...draft, fat: event.target.value })} /></label>
-        <label>Carbohidratos (g) · automático<input className="nai-input" readOnly value={preview ? preview.carbohydrates : '—'} /></label>
-      </div>
-      <h4>Reparto de calorías por comida ({round0(splitTotal)} %)</h4>
-      <div className="nai-form">
-        {mealTypes.map((meal) => (
-          <label key={meal.id}>{meal.label} (%)
-            <input className="nai-input" inputMode="decimal" value={split[meal.id]} onChange={(event) => setSplit({ ...split, [meal.id]: event.target.value })} />
-            {preview && <small className="nai-muted">{round0(preview.calories * ((parse(split[meal.id]) ?? 0) / 100))} kcal</small>}
-          </label>
-        ))}
-      </div>
-      <div className="nai-actions">
-        <button type="button" className="nai-btn" onClick={recalc}>Calcular desde mi perfil</button>
-        <button type="button" className="nai-btn nai-primary" onClick={save}>Guardar objetivos</button>
-      </div>
-      {message && <p className="nai-muted" role="status">{message}</p>}
-    </section>
-  );
-}
 
 function Recipes({ ctx }: { ctx: NutritionCtx }) {
   const { ai, updateAI } = ctx;
@@ -293,7 +231,6 @@ function WeekPlan({ ctx }: { ctx: NutritionCtx }) {
 export default function Planner({ ctx }: { ctx: NutritionCtx }) {
   return (
     <div className="nai-stack">
-      <TargetsEditor ctx={ctx} />
       <WeekPlan ctx={ctx} />
       <Recipes ctx={ctx} />
       <FavoriteMeals ctx={ctx} />
