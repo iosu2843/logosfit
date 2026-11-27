@@ -67,7 +67,7 @@ function summarizeBackup(backup: CloudBackup): string {
   if (routineDays > 0) summary.push(`${routineDays} día${routineDays === 1 ? '' : 's'} de rutina`);
 
   const customExerciseProfiles = asRecord(parseBackupItem(backup, 'fitness-custom-exercises-by-profile'));
-  const customExercises = Object.values(customExerciseProfiles ?? {}).reduce(
+  const customExercises = Object.values(customExerciseProfiles ?? {}).reduce<number>(
     (total, exercises) => total + (Array.isArray(exercises) ? exercises.length : 0),
     0,
   );
