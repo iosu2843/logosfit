@@ -1153,11 +1153,11 @@ export default function App() {
           <img
             alt="Emblema de LOGOSFIT"
             className="brand-logo"
-            src={asset('Captura%20de%20pantalla%202026-10-04%20180411.png')}
+            src={asset('logosfit-mark.png')}
           />
           <div className="brand-copy">
             <h2>LOGOSFIT</h2>
-            <small>Disciplina · Progreso · Equilibrio</small>
+            <small>Training & Performance</small>
           </div>
           <span className="brand-wordmark" aria-hidden="true">LOGOSFIT</span>
           </button>

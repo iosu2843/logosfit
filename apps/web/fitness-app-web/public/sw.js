@@ -1,4 +1,4 @@
-const CACHE = 'logosfit-v1';
+const CACHE = 'logosfit-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
