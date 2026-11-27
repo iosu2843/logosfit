@@ -2909,6 +2909,83 @@ h1, h2, h3, p {
   gap: 8px;
 }
 
+.cloud-backups {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.cloud-backups-heading,
+.cloud-backup-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cloud-backups-heading h4 {
+  font-size: 0.9rem;
+}
+
+.cloud-refresh-btn,
+.cloud-restore-btn {
+  border: 1px solid rgba(255, 176, 103, 0.3);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 122, 0, 0.08);
+  color: #ffb067;
+  padding: 7px 11px;
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.cloud-refresh-btn:disabled,
+.cloud-restore-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cloud-backup-list {
+  display: grid;
+  gap: 8px;
+}
+
+.cloud-backup-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.cloud-backup-title strong {
+  font-size: 0.78rem;
+}
+
+.cloud-backup-title span {
+  color: #ffb067;
+  font-size: 0.68rem;
+}
+
+.cloud-backup-summary,
+.cloud-restore-confirm p {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.cloud-restore-confirm {
+  display: grid;
+  gap: 9px;
+  margin-top: 3px;
+  padding: 10px;
+  border: 1px solid rgba(255, 176, 103, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 122, 0, 0.06);
+}
+
 .cloud-actions .danger-btn {
   margin-right: 0;
 }
