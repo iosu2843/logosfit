@@ -40,7 +40,6 @@ function parseBackupItem(backup: CloudBackup, key: string): unknown {
 }
 
 function summarizeBackup(backup: CloudBackup): string {
-  const items = backup.data.items;
   const summary: string[] = [];
   const profiles = parseBackupItem(backup, 'fitness-profiles');
   if (Array.isArray(profiles) && profiles.length > 0) {
@@ -223,7 +222,7 @@ export default function CloudPanel() {
                 {loadingBackups ? 'Cargando…' : 'Actualizar'}
               </button>
             </div>
-            <p className="cloud-note">Elige una versión para ver su resumen. Al restaurarla, el estado actual se conservará como una copia anterior.</p>
+            <p className="cloud-note">Cada versión incluye un resumen de sus datos. Al restaurarla, el estado actual se conservará como una copia anterior.</p>
             {loadingBackups && backups.length === 0 ? (
               <p className="cloud-note">Buscando copias guardadas…</p>
             ) : backups.length === 0 ? (
