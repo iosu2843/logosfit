@@ -24,6 +24,7 @@ const updatedAtKey = 'fitness-updated-at';
 const pushDelayMs = 1500;
 
 type CloudSnapshot = { updatedAt: number; items: Record<string, string> };
+export type CloudBackup = { id: number; createdAt: string; data: CloudSnapshot };
 export type SyncStatus = 'disabled' | 'signed-out' | 'syncing' | 'synced' | 'error';
 export type SyncResult = 'pushed' | 'pulled' | 'unchanged';
 
@@ -61,10 +62,10 @@ function buildSnapshot(): CloudSnapshot {
   return { updatedAt: readUpdatedAt(), items };
 }
 
-function applySnapshot(snapshot: CloudSnapshot) {
+function applySnapshot(snapshot: CloudSnapshot, preserveAdditiveMissing = true) {
   syncedKeys.forEach((key) => {
     if (key in snapshot.items) localStorage.setItem(key, snapshot.items[key]);
-    else if (key === 'fitness-custom-exercises-by-profile' || key === 'fitness-weekly-rotation-by-profile') return;
+    else if (preserveAdditiveMissing && (key === 'fitness-custom-exercises-by-profile' || key === 'fitness-weekly-rotation-by-profile')) return;
     else localStorage.removeItem(key);
   });
   localStorage.setItem(updatedAtKey, String(snapshot.updatedAt));
@@ -81,6 +82,66 @@ async function pushSnapshot(userId: string) {
     .from('app_state')
     .upsert({ user_id: userId, data: snapshot, updated_at: new Date().toISOString() });
   if (error) throw error;
+}
+
+function isCloudSnapshot(value: unknown): value is CloudSnapshot {
+  if (!value || typeof value !== 'object') return false;
+  const snapshot = value as Partial<CloudSnapshot>;
+  return typeof snapshot.updatedAt === 'number'
+    && Boolean(snapshot.items)
+    && typeof snapshot.items === 'object'
+    && !Array.isArray(snapshot.items)
+    && Object.values(snapshot.items).every((item) => typeof item === 'string');
+}
+
+export async function listCloudBackups(): Promise<CloudBackup[]> {
+  if (!client) return [];
+  const userId = await currentUserId();
+  if (!userId) return [];
+
+  const { data, error } = await client
+    .from('app_state_backups')
+    .select('id, created_at, data')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  if (error) throw error;
+
+  return (data ?? []).flatMap((row) => {
+    if (!isCloudSnapshot(row.data)) return [];
+    return [{ id: row.id, createdAt: row.created_at, data: row.data }];
+  });
+}
+
+export async function restoreCloudBackup(backupId: number): Promise<void> {
+  if (!client) throw new Error('La nube no está configurada');
+  const userId = await currentUserId();
+  if (!userId) throw new Error('Inicia sesión para restaurar una copia.');
+
+  const { data: backup, error: backupError } = await client
+    .from('app_state_backups')
+    .select('data')
+    .eq('id', backupId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (backupError) throw backupError;
+  if (!backup || !isCloudSnapshot(backup.data)) throw new Error('Esta copia ya no está disponible o está dañada.');
+
+  // Synchronize first so pending changes on this device are preserved as the current version.
+  await syncNow();
+  await pushSnapshot(userId);
+
+  const restored: CloudSnapshot = {
+    updatedAt: Date.now(),
+    items: { ...backup.data.items },
+  };
+  const { error: saveError } = await client
+    .from('app_state')
+    .upsert({ user_id: userId, data: restored, updated_at: new Date().toISOString() });
+  if (saveError) throw saveError;
+
+  applySnapshot(restored, false);
+  emit('synced');
 }
 
 export async function syncNow(): Promise<SyncResult> {
