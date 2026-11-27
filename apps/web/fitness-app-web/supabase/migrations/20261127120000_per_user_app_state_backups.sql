@@ -23,39 +23,22 @@ create policy "Users read their own backups"
   using ((select auth.uid()) = user_id);
 
 create or replace function private.capture_app_state_backup()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
+returns trigger language plpgsql security definer set search_path = ''
 as $$
-declare
-  snapshot_user_id uuid;
-  snapshot_data jsonb;
-  snapshot_updated_at timestamptz;
 begin
-  if tg_op = 'UPDATE' then
-    if new.data is not distinct from old.data then
-      return new;
-    end if;
-    -- Preserve the state being replaced so restore and sync operations can't erase it.
-    snapshot_user_id := old.user_id;
-    snapshot_data := old.data;
-    snapshot_updated_at := old.updated_at;
-  else
-    snapshot_user_id := new.user_id;
-    snapshot_data := new.data;
-    snapshot_updated_at := new.updated_at;
+  if tg_op = 'UPDATE' and new.data is not distinct from old.data then
+    return new;
   end if;
 
   insert into public.app_state_backups (user_id, data, source_updated_at)
-  values (snapshot_user_id, snapshot_data, coalesce(snapshot_updated_at, pg_catalog.now()));
+  values (new.user_id, new.data, coalesce(new.updated_at, pg_catalog.now()));
 
   delete from public.app_state_backups b
-  where b.user_id = snapshot_user_id
+  where b.user_id = new.user_id
     and b.id not in (
       select recent.id
       from public.app_state_backups recent
-      where recent.user_id = snapshot_user_id
+      where recent.user_id = new.user_id
       order by recent.created_at desc, recent.id desc
       offset 5
     );
