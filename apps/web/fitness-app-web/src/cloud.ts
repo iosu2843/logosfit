@@ -1,4 +1,3 @@
-Warning: fs was declared with const; use let for reassignable variables.
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
