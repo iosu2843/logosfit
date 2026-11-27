@@ -6,7 +6,7 @@ import { equipmentTypes, exerciseLibrary, muscleGroups, dayTypeOptions, recommen
 import MuscleDiagram from './MuscleDiagram';
 import CloudPanel from './CloudPanel';
 import NumInput from './NumInput';
-import { bestOneRepMax, countCompletedExercises, currentStreak, dayHasRecord, isDayCompleted, isDayStarted, personalBest, recentSessions, recordIds, recoveryWarnings, sessionSets, sessionVolume, setExerciseProgress, shiftWeeks, suggestNextWeight, suggestRestSeconds, topWeight, volumeByGroup, weekStartOf, weeklyAdherence, localKey, type SetLog, type WorkoutLog } from './workoutLog';
+import { bestOneRepMax, countCompletedExercises, dayHasRecord, isDayCompleted, isDayStarted, personalBest, recentSessions, recordIds, recoveryWarnings, sessionSets, sessionVolume, setExerciseProgress, shiftWeeks, suggestNextWeight, suggestRestSeconds, topWeight, volumeByGroup, weekStartOf, weeklyAdherence, localKey, type SetLog, type WorkoutLog } from './workoutLog';
 import { removeItem, saveItem } from './cloud';
 import NutritionModule from './nutrition/NutritionModule';
 import type { NutritionEntry, NutritionProfileData } from './nutrition/types';
@@ -22,13 +22,6 @@ const nextWeight = adjustWeight({
   lastWeight: 40,
   lastReps: 10,
 });
-
-const defaultStats = [
-  { label: 'Calorías', value: '620', unit: 'kcal' },
-  { label: 'Tiempo', value: '38', unit: 'min' },
-  { label: 'Peso', value: '75.4', unit: 'kg' },
-  { label: 'Objetivo', value: '86%', unit: 'cumplido' },
-];
 
 const navItems = ['Usuarios', 'Home', 'Calendario', 'Ejercicios', 'Progreso', 'Nutrición', 'Logros'];
 const navLabels: Record<string, string> = { Home: 'Inicio' };
@@ -46,6 +39,7 @@ const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//
 
 type CalendarExercise = { name: string; group: MuscleGroup; equipment?: EquipmentType; kind?: ActivityKind };
 type TrainingDay = { name: string; type: string; exercises: CalendarExercise[] };
+type WeeklyRotation = { mode: 'fixed' | 'alternating'; anchorWeekStart: string; weekB: Record<number, TrainingDay> };
 type ExerciseMetrics = { sets: number; reps: number; weight: number; level: number; duration: number; rest?: number };
 type ProgressPoint = { id: string; date: string; value: number };
 type ProfileProgressHistory = { bodyWeight: ProgressPoint[]; exerciseLoads: Record<string, ProgressPoint[]> };
@@ -197,6 +191,29 @@ function startOfWeek(date: Date) {
   return monday;
 }
 
+function cloneTrainingPlan(plan: Record<number, TrainingDay>): Record<number, TrainingDay> {
+  return Object.fromEntries(Object.entries(plan).map(([day, training]) => [day, {
+    ...training,
+    exercises: training.exercises.map((exercise) => ({ ...exercise })),
+  }]));
+}
+
+function currentStreakForSchedule(
+  getPlanForDate: (date: Date) => Record<number, TrainingDay>,
+  log: WorkoutLog,
+  today: Date,
+) {
+  let streak = 0;
+  for (let offset = 0; offset < 400; offset += 1) {
+    const date = addDays(today, -offset);
+    const exercises = getPlanForDate(date)[date.getDay()]?.exercises ?? [];
+    if (exercises.length === 0) continue;
+    if (isDayCompleted(exercises, log[localDateKey(date)])) streak += 1;
+    else if (offset > 0) break;
+  }
+  return streak;
+}
+
 function addDays(date: Date, days: number) {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -255,6 +272,24 @@ function readNutritionByProfile(): Record<string, NutritionProfileData> {
 function readSavedTrainingPlansByProfile(): Record<string, Record<number, TrainingDay>> {
   try {
     return JSON.parse(localStorage.getItem('fitness-training-plans-by-profile') ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+function readWeeklyRotationsByProfile(): Record<string, WeeklyRotation> {
+  try {
+    const saved = JSON.parse(localStorage.getItem('fitness-weekly-rotation-by-profile') ?? '{}');
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function readCustomExercisesByProfile(): Record<string, LibraryExercise[]> {
+  try {
+    const saved = JSON.parse(localStorage.getItem('fitness-custom-exercises-by-profile') ?? '{}');
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
   } catch {
     return {};
   }
@@ -375,17 +410,25 @@ export default function App() {
   const [sessionSetLogs, setSessionSetLogs] = useState<Record<string, SetLog[]>>({});
   const [repsDraft, setRepsDraft] = useState<Record<string, number>>({});
   const [prNotice, setPrNotice] = useState('');
-  const [restTimer, setRestTimer] = useState<RestTimerState>(() => createRestTimer(60));
-  const [restSecondsDraft, setRestSecondsDraft] = useState('60');
+  const [restTimersByExercise, setRestTimersByExercise] = useState<Record<string, RestTimerState>>({});
+  const hasRunningRestTimer = Object.values(restTimersByExercise).some((timer) => timer.isRunning);
   const [exerciseMetricsByProfile, setExerciseMetricsByProfile] = useState(readSavedMetricsByProfile);
   const [trainingPlansByProfile, setTrainingPlansByProfile] = useState(readSavedTrainingPlansByProfile);
+  const [weeklyRotationsByProfile, setWeeklyRotationsByProfile] = useState(readWeeklyRotationsByProfile);
   const [progressHistoryByProfile, setProgressHistoryByProfile] = useState(readProgressHistoryByProfile);
   const [nutritionByProfile, setNutritionByProfile] = useState(readNutritionByProfile);
   const [workoutLogByProfile, setWorkoutLogByProfile] = useState(readWorkoutLogByProfile);
   const [editorDayIndex, setEditorDayIndex] = useState(1);
+  const [editorPlanWeek, setEditorPlanWeek] = useState<'A' | 'B'>('A');
   const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | 'Todos'>('Todos');
   const [equipmentFilter, setEquipmentFilter] = useState<EquipmentType | 'Todos'>('Todos');
   const [librarySearch, setLibrarySearch] = useState('');
+  const [customExercisesByProfile, setCustomExercisesByProfile] = useState(readCustomExercisesByProfile);
+  const [isCustomExerciseFormOpen, setIsCustomExerciseFormOpen] = useState(false);
+  const [newExerciseName, setNewExerciseName] = useState('');
+  const [newExerciseGroup, setNewExerciseGroup] = useState<MuscleGroup>('Pecho');
+  const [newExerciseEquipment, setNewExerciseEquipment] = useState<EquipmentType>('Sin equipo');
+  const [customExerciseMessage, setCustomExerciseMessage] = useState('');
   const [progressBodyWeightDraft, setProgressBodyWeightDraft] = useState('');
   const [progressDraftProfileId, setProgressDraftProfileId] = useState('');
   const [progressExerciseName, setProgressExerciseName] = useState('');
@@ -405,6 +448,40 @@ export default function App() {
   const profileScopeId = activeProfile?.id ?? '__guest__';
   const exerciseMetrics = exerciseMetricsByProfile[profileScopeId] ?? {};
   const activeTrainingPlan = trainingPlansByProfile[profileScopeId] ?? trainingDays;
+  const savedWeeklyRotation = weeklyRotationsByProfile[profileScopeId];
+  const weeklyRotation: WeeklyRotation = savedWeeklyRotation ?? {
+    mode: 'fixed',
+    anchorWeekStart: localDateKey(startOfWeek(todayDate)),
+    weekB: cloneTrainingPlan(activeTrainingPlan),
+  };
+  const getPlanForDate = (date: Date): Record<number, TrainingDay> => {
+    if (weeklyRotation.mode !== 'alternating') return activeTrainingPlan;
+    const anchorDate = new Date(`${weeklyRotation.anchorWeekStart}T12:00:00`);
+    const weekOffset = Math.round((startOfWeek(date).getTime() - startOfWeek(anchorDate).getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return ((weekOffset % 2) + 2) % 2 === 0 ? activeTrainingPlan : weeklyRotation.weekB;
+  };
+  const getPlanForProfileDate = (id: string, date: Date): Record<number, TrainingDay> => {
+    const planA = trainingPlansByProfile[id] ?? trainingDays;
+    const rotation = weeklyRotationsByProfile[id];
+    if (rotation?.mode !== 'alternating') return planA;
+    const anchorDate = new Date(`${rotation.anchorWeekStart}T12:00:00`);
+    const weekOffset = Math.round((startOfWeek(date).getTime() - startOfWeek(anchorDate).getTime()) / (7 * 24 * 60 * 60 * 1000));
+    return ((weekOffset % 2) + 2) % 2 === 0 ? planA : rotation.weekB;
+  };
+  const getWeekPlan = (weekStart: Date): Record<number, TrainingDay> => {
+    const plan: Record<number, TrainingDay> = {};
+    for (let offset = 0; offset < 7; offset += 1) {
+      const date = addDays(weekStart, offset);
+      const day = getPlanForDate(date)[date.getDay()];
+      if (day) plan[date.getDay()] = day;
+    }
+    return plan;
+  };
+  const editorTrainingPlan = weeklyRotation.mode === 'alternating' && editorPlanWeek === 'B'
+    ? weeklyRotation.weekB
+    : activeTrainingPlan;
+  const customExercises = customExercisesByProfile[profileScopeId] ?? [];
+  const profileExerciseLibrary = [...exerciseLibrary, ...customExercises];
   const progressHistory = progressHistoryByProfile[profileScopeId] ?? { bodyWeight: [], exerciseLoads: {} };
   const workoutLog = workoutLogByProfile[profileScopeId] ?? {};
   const nutritionData = nutritionByProfile[profileScopeId] ?? defaultNutritionData(activeProfile);
@@ -416,8 +493,9 @@ export default function App() {
   const caloriesToday = mealEntriesToday.reduce((total, entry) => total + (entry.macros?.calories ?? 0), 0);
   const carbohydratesToday = mealEntriesToday.reduce((total, entry) => total + (entry.macros?.carbohydrates ?? 0), 0);
   const fatToday = mealEntriesToday.reduce((total, entry) => total + (entry.macros?.fat ?? 0), 0);
-  const progressDay = activeTrainingPlan[progressDayIndex];
-  const editorDay = activeTrainingPlan[editorDayIndex];
+  const progressDate = addDays(startOfWeek(todayDate), (progressDayIndex + 6) % 7);
+  const progressDay = getPlanForDate(progressDate)[progressDayIndex];
+  const editorDay = editorTrainingPlan[editorDayIndex];
   const progressExerciseOptions = progressDay?.exercises
     .filter((exercise) => exercise.kind !== 'cardio')
     .map((exercise) => exercise.name) ?? [];
@@ -441,7 +519,7 @@ export default function App() {
         { label: 'Edad', value: activeProfile.age || '--', unit: 'años' },
         { label: 'Peso objetivo', value: activeProfile.goalWeight || '--', unit: 'kg' },
       ]
-    : defaultStats;
+    : [];
 
   const gamToday = localDateKey(todayDate);
   const [gamState, updateGam] = useGamState(profileScopeId);
@@ -452,7 +530,7 @@ export default function App() {
     return {
       today: gamToday,
       workoutLog: workoutLogByProfile[id] ?? {},
-      plan: trainingPlansByProfile[id] ?? trainingDays,
+      plan: getPlanForProfileDate(id, new Date(`${gamToday}T12:00:00`)),
       bodyWeight: history.bodyWeight.map((point) => ({ date: point.date, value: point.value })),
       entriesByDay: nutrition.entriesByDay,
       nutrition: { recipes: readAIData(id).recipes.length, proteinGoal: nutrition.proteinGoalGrams, calorieTarget: null },
@@ -467,7 +545,7 @@ export default function App() {
   const gamReport = useMemo(
     () => buildReport(gamCtxFor(profileScopeId, activeProfile, gamState)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [profileScopeId, activeProfile, gamState, workoutLogByProfile, trainingPlansByProfile, progressHistoryByProfile, nutritionByProfile, gamToday, activeNav],
+    [profileScopeId, activeProfile, gamState, workoutLogByProfile, trainingPlansByProfile, weeklyRotationsByProfile, progressHistoryByProfile, nutritionByProfile, gamToday, activeNav],
   );
   const gamRanking = useMemo<RankEntry[]>(() => {
     if (activeNav !== 'Logros') return [];
@@ -530,12 +608,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!restTimer.isRunning) return;
+    if (!hasRunningRestTimer) return;
     const intervalId = window.setInterval(() => {
-      setRestTimer((current) => tickRestTimer(current));
+      setRestTimersByExercise((current) => Object.fromEntries(
+        Object.entries(current).map(([name, timer]) => [name, tickRestTimer(timer)]),
+      ));
     }, 1000);
     return () => window.clearInterval(intervalId);
-  }, [restTimer.isRunning]);
+  }, [hasRunningRestTimer]);
 
   const persistWorkoutLog = (update: (current: WorkoutLog) => WorkoutLog) => {
     setWorkoutLogByProfile((current) => {
@@ -572,8 +652,9 @@ export default function App() {
     setSessionSetLogs(Object.fromEntries(Object.entries(savedExercises).map(([name, entry]) => [name, entry.setLogs ?? []])));
     setRepsDraft({});
     setPrNotice('');
-    setRestTimer(createRestTimer(60));
-    setRestSecondsDraft('60');
+    setRestTimersByExercise(Object.fromEntries(dailyExercises
+      .filter((exercise) => exercise.kind !== 'cardio')
+      .map((exercise) => [exercise.name, createRestTimer(getMetrics(exerciseMetrics, exercise).rest)])));
     setScreen('session');
   };
 
@@ -613,14 +694,25 @@ export default function App() {
     }
   };
 
-  const beginRestPeriod = (seconds?: number) => {
-    const requestedSeconds = Math.min(600, Math.max(1, seconds ?? (Number(restSecondsDraft) || 60)));
-    setRestSecondsDraft(String(requestedSeconds));
-    setRestTimer(startRestTimer(createRestTimer(requestedSeconds)));
+  const beginRestPeriod = (exercise: CalendarExercise, seconds?: number) => {
+    const requestedSeconds = Math.min(600, Math.max(1, seconds ?? getMetrics(exerciseMetrics, exercise).rest));
+    setRestTimersByExercise((current) => ({
+      ...current,
+      [exercise.name]: startRestTimer(createRestTimer(requestedSeconds)),
+    }));
+  };
+
+  const updateRestTimer = (exerciseName: string, update: (timer: RestTimerState) => RestTimerState) => {
+    setRestTimersByExercise((current) => ({
+      ...current,
+      [exerciseName]: update(current[exerciseName] ?? createRestTimer(60)),
+    }));
   };
 
   const finishWorkout = () => {
-    setRestTimer((current) => pauseRestTimer(current));
+    setRestTimersByExercise((current) => Object.fromEntries(
+      Object.entries(current).map(([name, timer]) => [name, pauseRestTimer(timer)]),
+    ));
     const date = localDateKey(selectedDate);
     if (Object.values(sessionSetsCompleted).some((sets) => sets > 0)) {
       persistWorkoutLog((current) => current[date] ? { ...current, [date]: { ...current[date], finishedAt: new Date().toISOString() } } : current);
@@ -795,25 +887,30 @@ export default function App() {
   const monthStart = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), 1);
   const monthGridStart = startOfWeek(monthStart);
   const visibleMonth = Array.from({ length: 42 }, (_, index) => addDays(monthGridStart, index));
-  const selectedDay = activeTrainingPlan[selectedDate.getDay()];
+  const selectedDay = getPlanForDate(selectedDate)[selectedDate.getDay()];
   const dailyExercises = selectedDay?.exercises ?? [];
   const selectedDayLog = workoutLog[localDateKey(selectedDate)];
   const completedDailyExercises = countCompletedExercises(dailyExercises, selectedDayLog);
   const selectedDayCompleted = isDayCompleted(dailyExercises, selectedDayLog);
   const dayStatus = (date: Date): 'done' | 'partial' | 'none' => {
-    const planned = activeTrainingPlan[date.getDay()]?.exercises ?? [];
+    const planned = getPlanForDate(date)[date.getDay()]?.exercises ?? [];
     const log = workoutLog[localDateKey(date)];
     if (isDayCompleted(planned, log)) return 'done';
     return isDayStarted(log) ? 'partial' : 'none';
   };
   const trainingHistory = recentSessions(workoutLog, 10);
-  const thisWeekAdherence = weeklyAdherence(activeTrainingPlan, workoutLog, weekStartOf(todayDate));
-  const streak = currentStreak(activeTrainingPlan, workoutLog, todayDate);
+  const thisWeekAdherence = weeklyAdherence(getWeekPlan(weekStartOf(todayDate)), workoutLog, weekStartOf(todayDate));
+  const streak = currentStreakForSchedule(getPlanForDate, workoutLog, todayDate);
   const adherenceWeeks = Array.from({ length: 6 }, (_, index) => {
     const start = shiftWeeks(weekStartOf(todayDate), index - 5);
-    return { start, ...weeklyAdherence(activeTrainingPlan, workoutLog, start) };
+    return { start, ...weeklyAdherence(getWeekPlan(start), workoutLog, start) };
   });
-  const recoveryAlerts = recoveryWarnings(activeTrainingPlan, workoutLog, selectedDate, todayDate);
+  const yesterday = addDays(selectedDate, -1);
+  const recoveryPlan = {
+    ...getPlanForDate(selectedDate),
+    [yesterday.getDay()]: getPlanForDate(yesterday)[yesterday.getDay()],
+  };
+  const recoveryAlerts = recoveryWarnings(recoveryPlan, workoutLog, selectedDate, todayDate);
   const recordCount = Object.values(workoutLog).filter((day) => dayHasRecord(day)).length;
   const volumeKeyTo = localKey(todayDate);
   const volumeKeyFrom = localKey(shiftWeeks(todayDate, -1));
@@ -822,7 +919,10 @@ export default function App() {
     .map((name) => ({ name, oneRm: bestOneRepMax(workoutLog, name), top: Math.max(0, ...Object.values(workoutLog).map((day) => day.exercises[name] ? topWeight(day.exercises[name]) : 0)) }))
     .filter((item) => item.oneRm > 0)
     .sort((first, second) => second.oneRm - first.oneRm);
-  const completedSessionCount = Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).length;
+  const completedSessionCount = Object.entries(workoutLog).filter(([date, log]) => {
+    const loggedDate = new Date(`${date}T12:00:00`);
+    return isDayCompleted(getPlanForDate(loggedDate)[loggedDate.getDay()]?.exercises ?? [], log);
+  }).length;
   const plannedDailySets = dailyExercises
     .filter((exercise) => exercise.kind !== 'cardio')
     .reduce((total, exercise) => total + getMetrics(exerciseMetrics, exercise).sets, 0);
@@ -834,7 +934,7 @@ export default function App() {
   ];
   const nextWorkout = Array.from({ length: 8 }, (_, index) => {
     const date = addDays(todayDate, index);
-    return { date, offset: index, day: activeTrainingPlan[date.getDay()] };
+    return { date, offset: index, day: getPlanForDate(date)[date.getDay()] };
   }).find(({ date, offset, day }) => day?.exercises.length && (offset > 0 || !isDayCompleted(day.exercises, workoutLog[localDateKey(date)])));
   const nextWorkoutDateLabel = nextWorkout
     ? nextWorkout.offset === 0
@@ -845,7 +945,7 @@ export default function App() {
     : '';
   const nextWorkoutIsToday = nextWorkout?.offset === 0 && localDateKey(selectedDate) === localDateKey(todayDate);
   const nextWorkoutProgress = nextWorkout?.offset === 0 ? countCompletedExercises(nextWorkout.day.exercises, workoutLog[localDateKey(nextWorkout.date)]) : 0;
-  const todayDone = isDayCompleted(activeTrainingPlan[todayDate.getDay()]?.exercises ?? [], workoutLog[localDateKey(todayDate)]);
+  const todayDone = isDayCompleted(getPlanForDate(todayDate)[todayDate.getDay()]?.exercises ?? [], workoutLog[localDateKey(todayDate)]);
   const sidebarSuggestion = (() => {
     const candidates = [...(nextWorkout?.day.exercises ?? []), ...(selectedDay?.exercises ?? [])].filter((exercise) => exercise.kind !== 'cardio');
     for (const exercise of candidates) {
@@ -859,7 +959,7 @@ export default function App() {
     .filter((group) => muscleFilter === 'Todos' || group === muscleFilter)
     .map((group) => ({
       group,
-      exercises: exerciseLibrary.filter((exercise) => {
+      exercises: profileExerciseLibrary.filter((exercise) => {
         const searchMatch = exercise.name.toLocaleLowerCase('es').includes(librarySearch.trim().toLocaleLowerCase('es'));
         const equipmentMatch = equipmentFilter === 'Todos' || exercise.equipment === equipmentFilter;
         return exercise.group === group && searchMatch && equipmentMatch;
@@ -867,8 +967,40 @@ export default function App() {
     }))
     .filter(({ exercises }) => exercises.length > 0);
 
+  const saveRotationSettings = (settings: WeeklyRotation) => {
+    const next = { ...weeklyRotationsByProfile, [profileScopeId]: settings };
+    setWeeklyRotationsByProfile(next);
+    saveItem('fitness-weekly-rotation-by-profile', JSON.stringify(next));
+  };
+
+  const changeRotationMode = (mode: WeeklyRotation['mode']) => {
+    const settings = savedWeeklyRotation ?? {
+      mode: 'fixed' as const,
+      anchorWeekStart: localDateKey(startOfWeek(todayDate)),
+      weekB: cloneTrainingPlan(activeTrainingPlan),
+    };
+    saveRotationSettings({ ...settings, mode, weekB: settings.weekB ?? cloneTrainingPlan(activeTrainingPlan) });
+    if (mode === 'fixed') setEditorPlanWeek('A');
+  };
+
+  const changeRotationStart = (dateValue: string) => {
+    if (!dateValue) return;
+    const date = new Date(`${dateValue}T12:00:00`);
+    saveRotationSettings({ ...weeklyRotation, anchorWeekStart: localDateKey(startOfWeek(date)) });
+  };
+
+  const saveEditorPlan = (nextPlan: Record<number, TrainingDay>) => {
+    if (weeklyRotation.mode === 'alternating' && editorPlanWeek === 'B') {
+      saveRotationSettings({ ...weeklyRotation, weekB: nextPlan });
+      return;
+    }
+    const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
+    setTrainingPlansByProfile(nextByProfile);
+    saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+  };
+
   const saveTrainingDay = (dayIndex: number, exercises: CalendarExercise[], type?: string) => {
-    const nextPlan = { ...activeTrainingPlan };
+    const nextPlan = { ...editorTrainingPlan };
     if (exercises.length === 0 && !type) {
       delete nextPlan[dayIndex];
     } else {
@@ -879,9 +1011,7 @@ export default function App() {
         exercises,
       };
     }
-    const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
-    setTrainingPlansByProfile(nextByProfile);
-    saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+    saveEditorPlan(nextPlan);
     updateGam((current) => withDate(current, 'routineEdits', gamToday));
   };
 
@@ -892,15 +1022,13 @@ export default function App() {
   const copyRoutineToDay = (targetDayIndex: number) => {
     const source = editorDay;
     if (!source?.exercises.length) return;
-    const nextPlan = { ...activeTrainingPlan };
+    const nextPlan = { ...editorTrainingPlan };
     nextPlan[targetDayIndex] = {
       name: weekdayNames[targetDayIndex],
       type: source.type,
       exercises: source.exercises.map((exercise) => ({ ...exercise })),
     };
-    const nextByProfile = { ...trainingPlansByProfile, [profileScopeId]: nextPlan };
-    setTrainingPlansByProfile(nextByProfile);
-    saveItem('fitness-training-plans-by-profile', JSON.stringify(nextByProfile));
+    saveEditorPlan(nextPlan);
     updateGam((current) => withDate(current, 'routineEdits', gamToday));
     setEditorDayIndex(targetDayIndex);
   };
@@ -909,6 +1037,31 @@ export default function App() {
     const currentExercises = editorDay?.exercises ?? [];
     if (currentExercises.some((item) => item.name === exercise.name)) return;
     saveTrainingDay(editorDayIndex, [...currentExercises, exercise]);
+  };
+
+  const createCustomExercise = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = newExerciseName.trim();
+    if (!name) {
+      setCustomExerciseMessage('Escribe el nombre del ejercicio.');
+      return;
+    }
+    const duplicate = profileExerciseLibrary.some((exercise) => exercise.name.trim().toLocaleLowerCase('es') === name.toLocaleLowerCase('es'));
+    if (duplicate) {
+      setCustomExerciseMessage('Ya existe un ejercicio con ese nombre.');
+      return;
+    }
+    const newExercise: LibraryExercise = {
+      name,
+      group: newExerciseGroup,
+      equipment: newExerciseEquipment,
+      kind: newExerciseGroup === 'Cardio' ? 'cardio' : 'strength',
+    };
+    const next = { ...customExercisesByProfile, [profileScopeId]: [...customExercises, newExercise] };
+    setCustomExercisesByProfile(next);
+    saveItem('fitness-custom-exercises-by-profile', JSON.stringify(next));
+    setNewExerciseName('');
+    setCustomExerciseMessage(`“${name}” se añadió al repertorio.`);
   };
 
   const removePlanExercise = (exerciseName: string) => {
@@ -1159,26 +1312,28 @@ export default function App() {
                           <button className="session-set-button" type="button" disabled={isComplete} onClick={() => markWorkoutSetComplete(exercise)}>
                             {isComplete ? 'Ejercicio completado' : exercise.kind === 'cardio' ? 'Marcar actividad completada' : `Completar serie ${completedSets + 1} de ${targetSets}`}
                           </button>
-                          {exercise.kind !== 'cardio' && <button className="rest-start-button" type="button" onClick={() => beginRestPeriod(metrics.rest)}>Iniciar descanso ({metrics.rest} s)</button>}
                         </div>
+                        {exercise.kind !== 'cardio' && (() => {
+                          const timer = restTimersByExercise[exercise.name] ?? createRestTimer(metrics.rest);
+                          return (
+                            <div className="exercise-rest-timer" aria-label={`Temporizador de descanso de ${exercise.name}`}>
+                              <div className="exercise-rest-timer-copy">
+                                <span className="eyebrow muted">Descanso</span>
+                                <strong className={`rest-timer-display ${timer.isRunning ? 'running' : ''}`} aria-live="polite">{formatRestTime(timer.secondsLeft)}</strong>
+                              </div>
+                              <div className="exercise-rest-timer-actions">
+                                <button className="rest-start-button" type="button" onClick={() => beginRestPeriod(exercise)}>{timer.isRunning ? 'Reiniciar descanso' : 'Iniciar descanso'}</button>
+                                <button className="ghost-btn" type="button" disabled={!timer.isRunning} onClick={() => updateRestTimer(exercise.name, pauseRestTimer)}>Pausar</button>
+                                <button className="ghost-btn" type="button" onClick={() => updateRestTimer(exercise.name, resetRestTimer)}>Reiniciar</button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </article>
                     );
                   })}
                 </section>
 
-                <aside className="rest-timer-panel" style={{ background: theme.card }}>
-                  <p className="eyebrow muted">Descanso entre series</p>
-                  <div className={`rest-timer-display ${restTimer.isRunning ? 'running' : ''}`} aria-live="polite">{formatRestTime(restTimer.secondsLeft)}</div>
-                  <label className="rest-duration-field">
-                    Duración del descanso
-                    <span><input aria-label="Duración del descanso en segundos" type="number" min="1" max="600" step="15" value={restSecondsDraft} onChange={(event) => setRestSecondsDraft(event.target.value)} /><small>seg</small></span>
-                  </label>
-                  <div className="rest-timer-actions">
-                    <button className="primary-btn" type="button" onClick={() => beginRestPeriod()}>Iniciar</button>
-                    <button className="ghost-btn" type="button" onClick={() => setRestTimer((current) => pauseRestTimer(current))}>Pausar</button>
-                    <button className="ghost-btn" type="button" onClick={() => setRestTimer((current) => resetRestTimer(current))}>Reiniciar</button>
-                  </div>
-                </aside>
               </div>
             ) : (
               <div className="calendar-rest-state"><span className="rest-symbol">↗</span><p>No hay una rutina programada para este día.</p></div>
@@ -1257,7 +1412,8 @@ export default function App() {
                   <table className="progress-history-table">
                     <thead><tr><th>Fecha</th><th>Sesión</th><th>Series</th><th>Volumen</th><th>Estado</th></tr></thead>
                     <tbody>{trainingHistory.map(({ date, log }) => {
-                      const planned = activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [];
+                      const loggedDate = new Date(`${date}T12:00:00`);
+                      const planned = getPlanForDate(loggedDate)[loggedDate.getDay()]?.exercises ?? [];
                       return (
                         <tr key={date}>
                           <td>{formatProgressDate(date)}</td>
@@ -1383,11 +1539,14 @@ export default function App() {
             onAddEntries={addNutritionEntries}
             onRemoveEntry={removeNutritionEntry}
             onProteinGoal={(grams) => updateNutritionGoal('proteinGoalGrams', grams)}
-            plan={activeTrainingPlan}
+            plan={getPlanForDate(todayDate)}
             metrics={exerciseMetrics}
             bodyWeight={progressHistory.bodyWeight}
             exerciseLoads={progressHistory.exerciseLoads}
-            trainedDates={Object.entries(workoutLog).filter(([date, log]) => isDayCompleted(activeTrainingPlan[new Date(`${date}T12:00:00`).getDay()]?.exercises ?? [], log)).map(([date]) => date)}
+            trainedDates={Object.entries(workoutLog).filter(([date, log]) => {
+              const loggedDate = new Date(`${date}T12:00:00`);
+              return isDayCompleted(getPlanForDate(loggedDate)[loggedDate.getDay()]?.exercises ?? [], log);
+            }).map(([date]) => date)}
             onWaterGoal={(ml) => updateNutritionGoal('waterGoalMl', ml)}
           />
         ) : activeNav === 'Logros' ? (
@@ -1396,7 +1555,7 @@ export default function App() {
             state={gamState}
             today={gamToday}
             ranking={gamRanking}
-            exerciseNames={[...new Set(Object.values(activeTrainingPlan).flatMap((day) => day?.exercises.map((exercise) => exercise.name) ?? []))]}
+            exerciseNames={[...new Set([...Object.values(activeTrainingPlan), ...Object.values(weeklyRotation.weekB)].flatMap((day) => day?.exercises.map((exercise) => exercise.name) ?? []))]}
             onState={updateGam}
           />
         ) : activeNav === 'Usuarios' ? (
@@ -1467,8 +1626,6 @@ export default function App() {
                         <option value="">Seleccionar</option>
                         <option>Mujer</option>
                         <option>Hombre</option>
-                        <option>No binario</option>
-                        <option>Prefiero no decirlo</option>
                       </select>
                     </label>
                     <label className="profile-field">
@@ -1551,6 +1708,19 @@ export default function App() {
 
             <div className="exercise-editor-toolbar" style={{ background: theme.card }}>
               <label className="editor-day-field">
+                <span>Tipo de rutina semanal</span>
+                <select aria-label="Tipo de rutina semanal" value={weeklyRotation.mode} onChange={(event) => changeRotationMode(event.target.value as WeeklyRotation['mode'])}>
+                  <option value="fixed">Fija · se repite cada semana</option>
+                  <option value="alternating">Alterna · semanas A y B</option>
+                </select>
+              </label>
+              {weeklyRotation.mode === 'alternating' && (
+                <label className="editor-day-field rotation-start-field">
+                  <span>Inicio de Semana A</span>
+                  <input aria-label="Fecha de inicio de Semana A" type="date" value={weeklyRotation.anchorWeekStart} onChange={(event) => changeRotationStart(event.target.value)} />
+                </label>
+              )}
+              <label className="editor-day-field">
                 <span>Día del plan</span>
                 <select aria-label="Día del plan a editar" value={editorDayIndex} onChange={(event) => setEditorDayIndex(Number(event.target.value))}>
                   {editorDays.map((day) => <option key={day.index} value={day.index}>{day.name}</option>)}
@@ -1576,6 +1746,16 @@ export default function App() {
               </label>
               <p>Los cambios se guardan para {activeProfile?.name ?? 'este dispositivo'} y se reflejan en el calendario.</p>
             </div>
+
+            {weeklyRotation.mode === 'alternating' && (
+              <div className="weekly-plan-switch">
+                <div className="weekly-plan-tabs" role="group" aria-label="Semana del plan a editar">
+                  <button className={editorPlanWeek === 'A' ? 'selected' : ''} type="button" aria-pressed={editorPlanWeek === 'A'} onClick={() => setEditorPlanWeek('A')}>Semana A</button>
+                  <button className={editorPlanWeek === 'B' ? 'selected' : ''} type="button" aria-pressed={editorPlanWeek === 'B'} onClick={() => setEditorPlanWeek('B')}>Semana B</button>
+                </div>
+                <p>Las rutinas se alternan automáticamente cada lunes a partir de la fecha de inicio.</p>
+              </div>
+            )}
 
             <div className="exercise-editor-grid">
               <section className="editor-plan-panel" style={{ background: theme.card }}>
@@ -1624,9 +1804,46 @@ export default function App() {
               <section className="exercise-library-panel" style={{ background: theme.card }}>
                 <div className="section-header">
                   <div>
-                    <p className="eyebrow muted">{exerciseLibrary.length} ejercicios</p>
+                    <p className="eyebrow muted">{profileExerciseLibrary.length} ejercicios</p>
                     <h2>Repertorio</h2>
                   </div>
+                </div>
+
+                <div className="custom-exercise-creation">
+                  <button
+                    className="primary-btn custom-exercise-toggle"
+                    type="button"
+                    aria-expanded={isCustomExerciseFormOpen}
+                    onClick={() => { setIsCustomExerciseFormOpen((open) => !open); setCustomExerciseMessage(''); }}
+                  >
+                    {isCustomExerciseFormOpen ? 'Cerrar formulario' : 'Agregar nuevo ejercicio'}
+                  </button>
+                  {isCustomExerciseFormOpen && (
+                    <form className="custom-exercise-form" onSubmit={createCustomExercise}>
+                      <label>
+                        Nombre del ejercicio
+                        <input autoFocus maxLength={80} required value={newExerciseName} onChange={(event) => setNewExerciseName(event.target.value)} placeholder="Ej. Press unilateral en polea" />
+                      </label>
+                      <label>
+                        Grupo muscular
+                        <select value={newExerciseGroup} onChange={(event) => setNewExerciseGroup(event.target.value as MuscleGroup)}>
+                          {muscleGroups.map((group) => <option key={group} value={group}>{group}</option>)}
+                        </select>
+                      </label>
+                      <label>
+                        Equipo utilizado
+                        <select value={newExerciseEquipment} onChange={(event) => setNewExerciseEquipment(event.target.value as EquipmentType)}>
+                          {equipmentTypes.map((equipment) => <option key={equipment} value={equipment}>{equipment}</option>)}
+                        </select>
+                      </label>
+                      <div className="custom-exercise-preview">
+                        <MuscleDiagram exercise={{ name: newExerciseName.trim() || 'Nuevo ejercicio', group: newExerciseGroup }} size="sm" />
+                        <span>Ilustración para <strong>{newExerciseGroup}</strong></span>
+                      </div>
+                      <button className="primary-btn" type="submit">Guardar ejercicio</button>
+                      {customExerciseMessage && <p className="custom-exercise-message" role="status">{customExerciseMessage}</p>}
+                    </form>
+                  )}
                 </div>
 
                 {(() => {
@@ -1639,9 +1856,12 @@ export default function App() {
                       <div className="library-recommended-list">
                         {recommended.map((exercise) => (
                           <article className="library-exercise-row" key={exercise.name}>
-                            <div>
-                              <strong>{exercise.name}</strong>
-                              <small>{exercise.group} · {exercise.equipment}</small>
+                            <div className="library-exercise-info">
+                              <MuscleDiagram exercise={exercise} size="sm" />
+                              <span className="library-exercise-copy">
+                                <strong>{exercise.name}</strong>
+                                <small>{exercise.group} · {exercise.equipment}</small>
+                              </span>
                             </div>
                             <button className="editor-add-button" type="button" onClick={() => addLibraryExercise(exercise)}>Añadir</button>
                           </article>
@@ -1670,9 +1890,12 @@ export default function App() {
                         const alreadyAdded = Boolean(editorDay?.exercises.some((item) => item.name === exercise.name));
                         return (
                           <article className="library-exercise-row" key={exercise.name}>
-                            <div>
-                              <strong>{exercise.name}</strong>
-                              <small>{exercise.equipment}</small>
+                            <div className="library-exercise-info">
+                              <MuscleDiagram exercise={exercise} size="sm" />
+                              <span className="library-exercise-copy">
+                                <strong>{exercise.name}</strong>
+                                <small>{exercise.equipment}{customExercises.some((custom) => custom.name === exercise.name) ? ' · Personalizado' : ''}</small>
+                              </span>
                             </div>
                             <button className="editor-add-button" type="button" disabled={alreadyAdded} onClick={() => addLibraryExercise(exercise)}>
                               {alreadyAdded ? 'Añadido' : 'Añadir'}
@@ -1709,7 +1932,7 @@ export default function App() {
             {calendarView === 'week' ? (
               <div className="week-grid">
                 {visibleWeek.map((date, index) => {
-                  const day = activeTrainingPlan[date.getDay()];
+                  const day = getPlanForDate(date)[date.getDay()];
                   const selected = dateKey(date) === dateKey(selectedDate);
                   const status = dayStatus(date);
                   return (
@@ -1726,7 +1949,7 @@ export default function App() {
               <div className="month-calendar">
                 {weekDays.map((day) => <div className="month-weekday" key={day}>{day}</div>)}
                 {visibleMonth.map((date) => {
-                  const day = activeTrainingPlan[date.getDay()];
+                  const day = getPlanForDate(date)[date.getDay()];
                   const selected = dateKey(date) === dateKey(selectedDate);
                   const inMonth = date.getMonth() === calendarDate.getMonth();
                   const status = dayStatus(date);
@@ -1834,17 +2057,19 @@ export default function App() {
               ))}
             </section>
 
-            <section className="stats-grid">
-              {stats.map((stat) => (
-                <div key={stat.label} className="stat-card" style={{ background: theme.card }}>
-                  <span>{stat.label}</span>
-                  <strong>
-                    {stat.value}
-                    <small>{stat.unit}</small>
-                  </strong>
-                </div>
-              ))}
-            </section>
+            {stats.length > 0 && (
+              <section className="stats-grid">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="stat-card" style={{ background: theme.card }}>
+                    <span>{stat.label}</span>
+                    <strong>
+                      {stat.value}
+                      <small>{stat.unit}</small>
+                    </strong>
+                  </div>
+                ))}
+              </section>
+            )}
 
             <section className="content-grid">
               <HomeRanking report={gamReport} state={gamState} name={activeProfile?.name ?? 'Perfil local'} onOpen={() => setActiveNav('Logros')} />

@@ -1370,18 +1370,14 @@ h1, h2, h3, p {
 }
 
 .session-header-actions,
-.session-exercise-actions,
-.rest-timer-actions {
+.session-exercise-actions {
   display: flex;
   align-items: center;
   gap: 9px;
 }
 
 .session-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 290px;
-  align-items: start;
-  gap: 16px;
+  display: block;
 }
 
 .session-exercise-list {
@@ -1389,8 +1385,7 @@ h1, h2, h3, p {
   gap: 10px;
 }
 
-.session-exercise,
-.rest-timer-panel {
+.session-exercise {
   min-width: 0;
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1516,12 +1511,45 @@ h1, h2, h3, p {
   background: rgba(67, 153, 182, 0.1);
 }
 
-.rest-timer-panel {
-  position: sticky;
-  top: 16px;
-  display: grid;
+.exercise-rest-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 14px;
-  background: #1a1a1a;
+  margin: 14px 0 0 72px;
+  padding: 11px 13px;
+  border: 1px solid rgba(88, 170, 189, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(67, 153, 182, 0.07);
+}
+
+.exercise-rest-timer-copy {
+  display: grid;
+  gap: 5px;
+}
+
+.exercise-rest-timer-copy .rest-timer-display {
+  font-size: 1.8rem;
+  text-align: left;
+}
+
+.exercise-rest-timer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.exercise-rest-timer-actions .ghost-btn,
+.exercise-rest-timer-actions .rest-start-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.72rem;
+}
+
+.exercise-rest-timer-actions .ghost-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .rest-timer-display {
@@ -1535,47 +1563,6 @@ h1, h2, h3, p {
 
 .rest-timer-display.running {
   color: #9ed9e8;
-}
-
-.rest-duration-field {
-  display: grid;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 0.7rem;
-}
-
-.rest-duration-field span {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.rest-duration-field input {
-  width: 100%;
-  height: 36px;
-  padding: 0 9px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-sm);
-  outline: none;
-  color: #fff;
-  background: #111;
-  font: inherit;
-}
-
-.rest-duration-field small {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.rest-timer-actions {
-  flex-wrap: wrap;
-}
-
-.rest-timer-actions .primary-btn,
-.rest-timer-actions .ghost-btn {
-  flex: 1 1 auto;
-  padding: 9px 10px;
-  font-size: 0.74rem;
 }
 
 .exercise-editor-screen {
@@ -1617,6 +1604,7 @@ h1, h2, h3, p {
 }
 
 .editor-day-field select,
+.editor-day-field input,
 .library-filters input,
 .library-filters select {
   min-width: 0;
@@ -1631,7 +1619,12 @@ h1, h2, h3, p {
   font-size: 0.82rem;
 }
 
+.editor-day-field input[type='date'] {
+  color-scheme: dark;
+}
+
 .editor-day-field select:focus,
+.editor-day-field input:focus,
 .library-filters input:focus,
 .library-filters select:focus {
   border-color: #ff7a00;
@@ -1641,6 +1634,47 @@ h1, h2, h3, p {
 .editor-day-field select:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.weekly-plan-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 176, 103, 0.18);
+  border-radius: var(--radius-md);
+  background: rgba(255, 157, 61, 0.045);
+}
+
+.weekly-plan-switch p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.74rem;
+}
+
+.weekly-plan-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.weekly-plan-tabs button {
+  min-height: 36px;
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.04);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.weekly-plan-tabs button.selected {
+  border-color: rgba(255, 157, 61, 0.45);
+  color: #ffb067;
+  background: rgba(255, 157, 61, 0.1);
 }
 
 .library-recommended {
@@ -1663,6 +1697,70 @@ h1, h2, h3, p {
 .library-recommended-list .library-exercise-row {
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.04);
+}
+
+.custom-exercise-creation {
+  margin: 0 0 14px;
+}
+
+.custom-exercise-toggle {
+  width: 100%;
+}
+
+.custom-exercise-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.custom-exercise-form > label {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.74rem;
+}
+
+.custom-exercise-form input,
+.custom-exercise-form select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  outline: none;
+  color: #fff;
+  background: #171817;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.custom-exercise-form input:focus,
+.custom-exercise-form select:focus {
+  border-color: #ff7a00;
+  box-shadow: 0 0 0 2px rgba(255, 157, 61, 0.15);
+}
+
+.custom-exercise-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.74rem;
+}
+
+.custom-exercise-preview strong {
+  color: #ffb067;
+}
+
+.custom-exercise-message {
+  margin: 0;
+  color: #bce8a8;
+  font-size: 0.75rem;
 }
 
 .exercise-editor-grid {
@@ -1835,10 +1933,24 @@ h1, h2, h3, p {
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
 }
 
-.library-exercise-row > div {
+.library-exercise-row > .library-exercise-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 9px;
+  min-width: 0;
+}
+
+.library-exercise-copy {
   display: grid;
   min-width: 0;
   gap: 2px;
+}
+
+.library-exercise-info .muscle-figure.sm {
+  width: 42px;
+  height: 42px;
+  padding: 2px;
 }
 
 .library-exercise-row strong {
@@ -2409,6 +2521,11 @@ h1, h2, h3, p {
     text-align: left;
   }
 
+  .weekly-plan-switch {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .editor-plan-panel,
   .exercise-library-panel {
     padding: 14px;
@@ -2506,16 +2623,6 @@ h1, h2, h3, p {
   }
 
 
-@media (max-width: 900px) {
-  .session-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .rest-timer-panel {
-    position: static;
-  }
-}
-
 @media (max-width: 640px) {
   .session-header,
   .session-header-actions {
@@ -2542,8 +2649,22 @@ h1, h2, h3, p {
 
   .session-strength-metrics,
   .session-cardio-metrics,
-  .session-exercise-actions {
+  .session-exercise-actions,
+  .exercise-rest-timer {
     margin-left: 0;
+  }
+
+  .exercise-rest-timer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .exercise-rest-timer-actions {
+    width: 100%;
+  }
+
+  .exercise-rest-timer-actions button {
+    flex: 1 1 auto;
   }
 
   .session-strength-metrics {

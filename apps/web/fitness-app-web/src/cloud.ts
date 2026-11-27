@@ -1,3 +1,4 @@
+Warning: fs was declared with const; use let for reassignable variables.
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -15,6 +16,8 @@ const syncedKeys = [
   'fitness-nutrition-by-profile',
   'fitness-nutrition-ai-by-profile',
   'fitness-training-plans-by-profile',
+  'fitness-custom-exercises-by-profile',
+  'fitness-weekly-rotation-by-profile',
   'fitness-gamification-by-profile',
 ] as const;
 
@@ -62,6 +65,7 @@ function buildSnapshot(): CloudSnapshot {
 function applySnapshot(snapshot: CloudSnapshot) {
   syncedKeys.forEach((key) => {
     if (key in snapshot.items) localStorage.setItem(key, snapshot.items[key]);
+    else if (key === 'fitness-custom-exercises-by-profile' || key === 'fitness-weekly-rotation-by-profile') return;
     else localStorage.removeItem(key);
   });
   localStorage.setItem(updatedAtKey, String(snapshot.updatedAt));
@@ -96,7 +100,13 @@ export async function syncNow(): Promise<SyncResult> {
     let result: SyncResult = 'unchanged';
 
     if (remote && remote.updatedAt > localUpdatedAt) {
+      const additiveStateKeys = ['fitness-custom-exercises-by-profile', 'fitness-weekly-rotation-by-profile'];
+      const keepLocalNewState = additiveStateKeys.some((key) => localStorage.getItem(key) !== null && !(key in remote.items));
       applySnapshot(remote);
+      if (keepLocalNewState) {
+        localStorage.setItem(updatedAtKey, String(Date.now()));
+        await pushSnapshot(userId);
+      }
       result = 'pulled';
     } else if (!remote || remote.updatedAt < localUpdatedAt) {
       if (localUpdatedAt === 0) localStorage.setItem(updatedAtKey, String(Date.now()));
